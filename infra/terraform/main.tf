@@ -269,8 +269,11 @@ resource "aws_cloudfront_distribution" "application" {
   }
 
   origin {
-    domain_name = trimprefix(aws_lambda_function_url.backend.function_url, "https://")
-    origin_id   = "backend-lambda-url"
+    domain_name = trimsuffix(
+      trimprefix(aws_lambda_function_url.backend.function_url, "https://"),
+      "/",
+    )
+    origin_id = "backend-lambda-url"
 
     custom_origin_config {
       http_port                = 80

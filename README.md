@@ -124,18 +124,22 @@ Terraform uses normal local state only. It creates an immutable, scan-on-push EC
 
 Prerequisites are Terraform, Docker, AWS CLI credentials for the target account, and an OpenAI key in a local environment variable. Never place the key in `terraform.tfvars`, source control, a Docker image, or a shell command literal.
 
-Set the target region:
+Set the named AWS profile and region for both AWS CLI and Terraform:
 
 ```powershell
-$region = "ap-southeast-2"
+$env:AWS_PROFILE = "opspilot"
+$env:AWS_REGION = "ap-southeast-2"
+$region = $env:AWS_REGION
 ```
+
+If the temporary login has expired, authenticate the named profile first with `aws login --profile opspilot --region ap-southeast-2`. `AWS_PROFILE` directs both AWS CLI and Terraform to that profile; temporary credentials can expire and require that login again.
 
 The first deployment deliberately has two phases because the private ECR repository must exist before a Lambda image can be pushed. From `infra/terraform/`, authenticate the intended AWS profile, initialize Terraform, verify identity, and run a normal plan before creating the external SecureString:
 
 ```powershell
 $imageTag = git -C ../.. rev-parse HEAD
 terraform init
-aws sts get-caller-identity --region $region
+aws sts get-caller-identity
 terraform plan -var="backend_image_tag=$imageTag"
 ```
 
@@ -143,7 +147,7 @@ Create or update the SecureString outside Terraform. This command reads the valu
 
 ```powershell
 if (-not $env:OPENAI_API_KEY) { throw "Set OPENAI_API_KEY in your environment first." }
-aws ssm put-parameter --region $region --name /opspilot/prod/openai-api-key --type SecureString --value $env:OPENAI_API_KEY --overwrite
+aws ssm put-parameter --name /opspilot/prod/openai-api-key --type SecureString --value $env:OPENAI_API_KEY --overwrite
 ```
 
 Then bootstrap only ECR and its Lambda image-retrieval policy (the target is limited to this one-time bootstrap):
@@ -157,7 +161,7 @@ Then authenticate to ECR, build and push the immutable Git-SHA-tagged Lambda ima
 ```powershell
 $repository = terraform output -raw ecr_repository_url
 $registry = $repository.Split('/')[0]
-aws ecr get-login-password --region $region | docker login --username AWS --password-stdin $registry
+aws ecr get-login-password | docker login --username AWS --password-stdin $registry
 docker build --platform linux/amd64 --tag "opspilot-backend:$imageTag" ../../backend
 docker tag "opspilot-backend:$imageTag" "${repository}:$imageTag"
 docker push "${repository}:$imageTag"
