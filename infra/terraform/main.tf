@@ -56,18 +56,6 @@ data "aws_iam_policy_document" "lambda_ecr_pull" {
       type        = "Service"
       identifiers = ["lambda.amazonaws.com"]
     }
-
-    condition {
-      test     = "StringEquals"
-      variable = "AWS:SourceAccount"
-      values   = [data.aws_caller_identity.current.account_id]
-    }
-
-    condition {
-      test     = "ArnLike"
-      variable = "AWS:SourceArn"
-      values   = ["arn:${data.aws_partition.current.partition}:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.lambda_function_name}"]
-    }
   }
 }
 
