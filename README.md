@@ -4,7 +4,7 @@ OpsPilot is a focused AI Business Operations Agent portfolio project. It is bein
 
 ## Status
 
-The application foundation is in place. The backend provides a health endpoint and PostgreSQL-ready configuration; the frontend provides an MVP shell. Business data, AI, and agent functionality are not implemented yet.
+The application foundation and a synthetic business-data layer are in place. The backend provides a health endpoint plus deterministic product, sales, inventory, and campaign queries. AI and agent functionality are not implemented yet.
 
 ## Repository structure
 
@@ -39,6 +39,25 @@ Run backend tests from `backend/`:
 ```powershell
 pytest
 ```
+
+## Synthetic business data
+
+Task 002 adds compact, deterministic demo data for products, aggregated daily sales, current inventory, and marketing campaigns. It is entirely synthetic and does not represent a real company. The data intentionally includes a fast-selling, low-stock product; a low-selling product with excess stock; and both strong and weak campaign ROI.
+
+Seed the configured database from `backend/`:
+
+```powershell
+python -m app.db.seed
+```
+
+The seed command creates the business tables and inserts the demo data once; later runs leave existing data unchanged. The default configuration targets local PostgreSQL. For a disposable SQLite demo database, set `DATABASE_URL` first:
+
+```powershell
+$env:DATABASE_URL = "sqlite:///./opspilot-demo.db"
+python -m app.db.seed
+```
+
+The query services live in `app.services.business_queries` and return structured Python data for future AI tool wrapping; they are not API endpoints or LLM tools.
 
 ## Frontend local setup
 

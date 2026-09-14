@@ -24,6 +24,8 @@ Do not implement the LLM agent yet.
 
 ### Task 002 — Business Data Layer
 
+**Status:** Complete
+
 **Goal:** Create realistic synthetic business data and deterministic query services.
 
 **Planned domains:**
