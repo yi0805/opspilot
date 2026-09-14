@@ -11,11 +11,17 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AgentQueryResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const handleQuestionChange = (nextQuestion: string) => {
+    setQuestion(nextQuestion)
+    setResult(null)
+    setError(null)
+  }
   const submitQuestion = async () => {
     const trimmedQuestion = question.trim()
     if (!trimmedQuestion || loading) return
     setLoading(true)
     setError(null)
+    setResult(null)
     try {
       setResult(await queryAgent(trimmedQuestion))
     } catch (requestError) {
@@ -36,11 +42,11 @@ function App() {
       </section>
       <section className="workspace" id="workspace" aria-labelledby="workspace-title">
         <div className="section-heading"><p className="eyebrow">Question workspace</p><h2 id="workspace-title">What do you need to know?</h2></div>
-        <QuestionForm question={question} loading={loading} onQuestionChange={setQuestion} onSubmit={submitQuestion} />
+        <QuestionForm question={question} loading={loading} onQuestionChange={handleQuestionChange} onSubmit={submitQuestion} />
         {loading && <div className="loading-message" role="status"><span className="spinner" aria-hidden="true" />Analyzing business data…</div>}
         {error && <div className="error-panel" role="alert"><strong>OpsPilot could not complete the request.</strong><span>{error}</span></div>}
       </section>
-      <ExamplePrompts onSelect={setQuestion} />
+      <ExamplePrompts disabled={loading} onSelect={handleQuestionChange} />
       {result && <ResultPanel result={result} />}
     </main>
   )

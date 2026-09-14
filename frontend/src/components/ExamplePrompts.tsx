@@ -5,6 +5,6 @@ const prompts = [
   'How much inventory is available for FW-100?',
 ]
 
-export function ExamplePrompts({ onSelect }: { onSelect: (prompt: string) => void }) {
-  return <section className="examples" aria-labelledby="example-prompts-title"><div className="section-heading"><p className="eyebrow">Start with a signal</p><h2 id="example-prompts-title">Example questions</h2></div><div className="prompt-list">{prompts.map((prompt) => <button key={prompt} type="button" className="prompt-button" onClick={() => onSelect(prompt)}>{prompt}</button>)}</div></section>
+export function ExamplePrompts({ disabled, onSelect }: { disabled: boolean; onSelect: (prompt: string) => void }) {
+  return <section className="examples" aria-labelledby="example-prompts-title"><div className="section-heading"><p className="eyebrow">Start with a signal</p><h2 id="example-prompts-title">Example questions</h2></div><div className="prompt-list">{prompts.map((prompt) => <button key={prompt} type="button" className="prompt-button" disabled={disabled} onClick={() => onSelect(prompt)}>{prompt}</button>)}</div></section>
 }
