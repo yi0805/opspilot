@@ -1,29 +1,71 @@
-"""Single-cycle Responses API business-question service."""
+"""Controlled multi-tool Responses API business-question service."""
 
 import json
 from typing import Any, Literal
 
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.services.llm_tools import TOOL_DEFINITIONS, ToolDispatchError, dispatch_tool
+from app.services.llm_tools import (
+    TOOL_DEFINITIONS,
+    ToolDispatchError,
+    dispatch_tool,
+    validate_tool_arguments,
+)
 
 
 SYSTEM_INSTRUCTIONS = (
-    "Answer concise business questions using the supplied business tools. "
-    "Use tools for business-data facts; do not invent metrics. "
-    "If the data cannot answer, say so plainly. "
-    "This interaction supports one tool call only."
+    "Answer concise, commercially understandable business questions using the supplied "
+    "business tools. Use tools for every business-data fact and use multiple tools when "
+    "the question needs multiple data sources. Do not invent metrics or claim data that a "
+    "tool did not return. Distinguish observations from recommendations, and make a "
+    "recommendation only when collected evidence supports it. If evidence is empty or "
+    "insufficient, explain that limitation and set recommendation to null. Do not claim "
+    "causation from this synthetic data; describe only correlation or association. Do not "
+    "reveal hidden reasoning."
 )
+
+MAX_TOOL_CALLS = 4
+EVIDENCE_SOURCE = "synthetic_business_data"
+FINAL_OUTPUT_SCHEMA = {
+    "type": "json_schema",
+    "name": "business_question_answer",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "answer": {"type": "string"},
+            "recommendation": {"type": ["string", "null"]},
+            "limitations": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["answer", "recommendation", "limitations"],
+        "additionalProperties": False,
+    },
+}
+
+
+class EvidenceRecord(BaseModel):
+    tool: str
+    arguments: dict[str, Any]
+    data: Any
+    source: Literal["synthetic_business_data"] = EVIDENCE_SOURCE
+
+
+class _FinalModelPayload(BaseModel):
+    answer: str = Field(min_length=1)
+    recommendation: str | None = None
+    limitations: list[str] = Field(default_factory=list)
 
 
 class BusinessQuestionResult(BaseModel):
     answer: str
-    tool_used: str | None = None
-    tool_arguments: dict[str, Any] | None = None
-    status: Literal["completed", "tool_error", "unsupported_multi_tool"] = "completed"
+    recommendation: str | None = None
+    evidence: list[EvidenceRecord] = Field(default_factory=list)
+    status: Literal["completed", "tool_error", "tool_limit_reached", "duplicate_tool_call"] = (
+        "completed"
+    )
 
 
 class LLMConfigurationError(RuntimeError):
@@ -55,24 +97,27 @@ def _output_text(response: Any) -> str:
     return output_text.strip()
 
 
-def answer_business_question(
-    session: Session,
-    question: str,
-    *,
-    client: OpenAI | Any | None = None,
-    settings: Settings | None = None,
-) -> BusinessQuestionResult:
-    """Answer one question with at most one allowlisted business-tool execution."""
-    configured_settings = settings or get_settings()
-    if client is None:
-        if not configured_settings.openai_api_key:
-            raise LLMConfigurationError("OPENAI_API_KEY is not configured.")
-        client = OpenAI(api_key=configured_settings.openai_api_key)
-
-    input_messages: list[Any] = [{"role": "user", "content": question}]
+def _final_payload(response: Any) -> _FinalModelPayload:
     try:
-        initial_response = client.responses.create(
-            model=configured_settings.openai_model,
+        payload = json.loads(_output_text(response))
+        return _FinalModelPayload.model_validate(payload)
+    except (json.JSONDecodeError, ValidationError) as error:
+        raise LLMProviderError("The model returned an invalid structured final answer.") from error
+
+
+def _response_output(response: Any) -> list[Any]:
+    output = _item_value(response, "output") or []
+    if not isinstance(output, list):
+        raise LLMProviderError("The model returned an invalid response output.")
+    return output
+
+
+def _create_reasoning_response(
+    client: OpenAI | Any, settings: Settings, input_messages: list[Any]
+) -> Any:
+    try:
+        return client.responses.create(
+            model=settings.openai_model,
             instructions=SYSTEM_INSTRUCTIONS,
             input=input_messages,
             tools=list(TOOL_DEFINITIONS),
@@ -81,53 +126,120 @@ def answer_business_question(
     except Exception as error:
         raise LLMProviderError("OpenAI could not process the business question.") from error
 
-    function_calls = _function_calls(initial_response)
-    if len(function_calls) > 1:
-        return BusinessQuestionResult(
-            answer="This question needs multiple business tools, which is not supported yet.",
-            status="unsupported_multi_tool",
-        )
-    if not function_calls:
-        return BusinessQuestionResult(answer=_output_text(initial_response))
 
-    function_call = function_calls[0]
-    tool_name = _item_value(function_call, "name")
-    arguments = _item_value(function_call, "arguments")
-    call_id = _item_value(function_call, "call_id")
-    if not isinstance(tool_name, str) or not isinstance(call_id, str):
-        raise LLMProviderError("The model returned an invalid tool call.")
-
+def _create_final_response(client: OpenAI | Any, settings: Settings, input_messages: list[Any]) -> Any:
     try:
-        tool_result = dispatch_tool(session, tool_name, arguments)
-    except ToolDispatchError as error:
-        return BusinessQuestionResult(
-            answer=f"I could not run the requested business tool: {error}",
-            tool_used=tool_name,
-            status="tool_error",
-        )
-
-    input_messages.extend(_item_value(initial_response, "output") or [])
-    input_messages.append(
-        {
-            "type": "function_call_output",
-            "call_id": call_id,
-            "output": json.dumps(tool_result),
-        }
-    )
-    try:
-        final_response = client.responses.create(
-            model=configured_settings.openai_model,
+        return client.responses.create(
+            model=settings.openai_model,
             instructions=SYSTEM_INSTRUCTIONS,
             input=input_messages,
             tools=list(TOOL_DEFINITIONS),
             parallel_tool_calls=False,
             tool_choice="none",
+            text={"format": FINAL_OUTPUT_SCHEMA},
         )
     except Exception as error:
         raise LLMProviderError("OpenAI could not produce a final business answer.") from error
 
-    return BusinessQuestionResult(
-        answer=_output_text(final_response),
-        tool_used=tool_name,
-        tool_arguments=tool_result["arguments"],
-    )
+
+def answer_business_question(
+    session: Session,
+    question: str,
+    *,
+    client: OpenAI | Any | None = None,
+    settings: Settings | None = None,
+) -> BusinessQuestionResult:
+    """Answer a question through a capped, sequential allowlisted-tool workflow."""
+    configured_settings = settings or get_settings()
+    if client is None:
+        if not configured_settings.openai_api_key:
+            raise LLMConfigurationError("OPENAI_API_KEY is not configured.")
+        client = OpenAI(api_key=configured_settings.openai_api_key)
+
+    input_messages: list[Any] = [{"role": "user", "content": question}]
+    evidence: list[EvidenceRecord] = []
+    executed_calls: set[str] = set()
+
+    while True:
+        response = _create_reasoning_response(client, configured_settings, input_messages)
+        response_output = _response_output(response)
+        function_calls = _function_calls(response)
+        if len(function_calls) > 1:
+            raise LLMProviderError("The model returned multiple tool calls in one turn.")
+
+        input_messages.extend(response_output)
+        if not function_calls:
+            final_response = _create_final_response(client, configured_settings, input_messages)
+            final_payload = _final_payload(final_response)
+            return BusinessQuestionResult(
+                answer=final_payload.answer,
+                recommendation=final_payload.recommendation,
+                evidence=evidence,
+            )
+
+        if len(evidence) >= MAX_TOOL_CALLS:
+            return BusinessQuestionResult(
+                answer=(
+                    "I could not complete the analysis because it exceeded the maximum "
+                    "number of business-tool calls."
+                ),
+                evidence=evidence,
+                status="tool_limit_reached",
+            )
+
+        function_call = function_calls[0]
+        tool_name = _item_value(function_call, "name")
+        arguments = _item_value(function_call, "arguments")
+        call_id = _item_value(function_call, "call_id")
+        if not isinstance(tool_name, str) or not isinstance(call_id, str):
+            raise LLMProviderError("The model returned an invalid tool call.")
+
+        try:
+            canonical_arguments = validate_tool_arguments(tool_name, arguments)
+        except ToolDispatchError as error:
+            return BusinessQuestionResult(
+                answer=f"I could not run the requested business tool: {error}",
+                evidence=evidence,
+                status="tool_error",
+            )
+
+        call_signature = json.dumps(
+            {"tool": tool_name, "arguments": canonical_arguments}, sort_keys=True, separators=(",", ":")
+        )
+        if call_signature in executed_calls:
+            return BusinessQuestionResult(
+                answer="I could not complete the analysis because the same business-tool request repeated.",
+                evidence=evidence,
+                status="duplicate_tool_call",
+            )
+
+        try:
+            tool_result = dispatch_tool(session, tool_name, canonical_arguments)
+        except ToolDispatchError as error:
+            return BusinessQuestionResult(
+                answer=f"I could not run the requested business tool: {error}",
+                evidence=evidence,
+                status="tool_error",
+            )
+        except Exception:
+            return BusinessQuestionResult(
+                answer="I could not run the requested business tool because the data query failed.",
+                evidence=evidence,
+                status="tool_error",
+            )
+
+        executed_calls.add(call_signature)
+        evidence.append(
+            EvidenceRecord(
+                tool=tool_result["tool"],
+                arguments=tool_result["arguments"],
+                data=tool_result["data"],
+            )
+        )
+        input_messages.append(
+            {
+                "type": "function_call_output",
+                "call_id": call_id,
+                "output": json.dumps(tool_result),
+            }
+        )

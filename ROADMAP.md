@@ -69,6 +69,8 @@ Do not implement the LLM agent yet.
 
 ### Task 004 — Business Reasoning and Traceability
 
+**Status:** Complete
+
 **Goal:** Support questions requiring multiple data sources and produce evidence-based recommendations.
 
 **Planned scope:**
