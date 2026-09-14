@@ -45,13 +45,11 @@ resource "aws_ecr_lifecycle_policy" "backend" {
 
 data "aws_iam_policy_document" "lambda_ecr_pull" {
   statement {
-    sid = "AllowLambdaImageRetrieval"
+    sid = "LambdaECRImageRetrievalPolicy"
     actions = [
       "ecr:BatchGetImage",
       "ecr:GetDownloadUrlForLayer",
     ]
-    resources = ["*"]
-
     principals {
       type        = "Service"
       identifiers = ["lambda.amazonaws.com"]
