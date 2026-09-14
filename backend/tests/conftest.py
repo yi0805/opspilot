@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models  # Register model metadata before creating the isolated schema.
+import app.models  # noqa: F401 - registers all model metadata for the isolated schema.
 from app.db.base import Base
 
 

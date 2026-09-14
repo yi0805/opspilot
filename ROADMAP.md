@@ -106,6 +106,8 @@ Keep the UI polished but small.
 
 ### Task 006 — Production Hardening
 
+**Status:** Complete
+
 **Goal:** Make the repository portfolio-ready.
 
 **Planned scope:**

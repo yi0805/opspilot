@@ -5,7 +5,12 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.db.seed import seed_demo_data
-from app.services.llm_tools import TOOL_DEFINITIONS, ToolDispatchError, dispatch_tool, json_safe
+from app.services.llm_tools import (
+    TOOL_DEFINITIONS,
+    ToolDispatchError,
+    dispatch_tool,
+    json_safe,
+)
 
 
 def test_tool_definitions_expose_only_the_four_intended_tools() -> None:

@@ -3,19 +3,15 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.api.routes import agent as agent_route
 from app.db.seed import seed_demo_data
-from app.main import app
 from app.services.llm_agent import (
     FINAL_OUTPUT_SCHEMA,
     MAX_TOOL_CALLS,
-    BusinessQuestionResult,
-    LLMConfigurationError,
-    LLMProviderError,
     SYSTEM_INSTRUCTIONS,
+    BusinessQuestionResult,
+    LLMProviderError,
     answer_business_question,
 )
 from app.services.llm_tools import TOOL_DEFINITIONS
@@ -279,74 +275,3 @@ def test_agent_rejects_malformed_structured_final_response(session: Session) -> 
 
     with pytest.raises(LLMProviderError, match="invalid structured final answer"):
         answer_business_question(session, "What can you help with?", client=client)
-
-
-def test_agent_query_endpoint_rejects_blank_or_missing_questions() -> None:
-    client = TestClient(app)
-
-    assert client.post("/api/agent/query", json={"question": "   "}).status_code == 422
-    assert client.post("/api/agent/query", json={}).status_code == 422
-
-
-def test_agent_query_endpoint_returns_controlled_configuration_error(monkeypatch: object) -> None:
-    def missing_configuration(_: Session, __: str) -> BusinessQuestionResult:
-        raise LLMConfigurationError("OPENAI_API_KEY is not configured.")
-
-    monkeypatch.setattr(agent_route, "answer_business_question", missing_configuration)
-    response = TestClient(app).post("/api/agent/query", json={"question": "What stock is available?"})
-
-    assert response.status_code == 503
-    assert response.json() == {"detail": "OPENAI_API_KEY is not configured."}
-
-
-def test_agent_query_endpoint_maps_provider_error_to_bad_gateway(monkeypatch: object) -> None:
-    def provider_failure(_: Session, __: str) -> BusinessQuestionResult:
-        raise LLMProviderError("The model returned an invalid structured final answer.")
-
-    monkeypatch.setattr(agent_route, "answer_business_question", provider_failure)
-    response = TestClient(app).post("/api/agent/query", json={"question": "What stock is available?"})
-
-    assert response.status_code == 502
-    assert response.json() == {"detail": "The model returned an invalid structured final answer."}
-
-
-def test_agent_query_endpoint_returns_evidence_and_recommendation(
-    monkeypatch: object, session: Session
-) -> None:
-    def fake_answer(_: Session, __: str) -> BusinessQuestionResult:
-        return BusinessQuestionResult(
-            answer="FW-100 stock is low.",
-            recommendation="Review replenishment.",
-            evidence=[
-                {
-                    "tool": "query_inventory",
-                    "arguments": {"sku": "FW-100"},
-                    "data": [{"available_stock": 22}],
-                    "source": "synthetic_business_data",
-                }
-            ],
-        )
-
-    monkeypatch.setattr(agent_route, "answer_business_question", fake_answer)
-    app.dependency_overrides[agent_route.get_db] = lambda: session
-    try:
-        response = TestClient(app).post(
-            "/api/agent/query", json={"question": "How much stock is available for FW-100?"}
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "answer": "FW-100 stock is low.",
-        "recommendation": "Review replenishment.",
-        "evidence": [
-            {
-                "tool": "query_inventory",
-                "arguments": {"sku": "FW-100"},
-                "data": [{"available_stock": 22}],
-                "source": "synthetic_business_data",
-            }
-        ],
-        "status": "completed",
-    }

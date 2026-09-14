@@ -15,7 +15,6 @@ from app.services.llm_tools import (
     validate_tool_arguments,
 )
 
-
 SYSTEM_INSTRUCTIONS = (
     "Answer concise, commercially understandable business questions using the supplied "
     "business tools. Use tools for every business-data fact and use multiple tools when "
@@ -28,7 +27,7 @@ SYSTEM_INSTRUCTIONS = (
 )
 
 MAX_TOOL_CALLS = 4
-EVIDENCE_SOURCE = "synthetic_business_data"
+EVIDENCE_SOURCE: Literal["synthetic_business_data"] = "synthetic_business_data"
 FINAL_OUTPUT_SCHEMA = {
     "type": "json_schema",
     "name": "business_question_answer",
@@ -125,7 +124,7 @@ def _create_reasoning_response(
             model=settings.openai_model,
             instructions=SYSTEM_INSTRUCTIONS,
             input=input_messages,
-            tools=list(TOOL_DEFINITIONS),
+            tools=list(TOOL_DEFINITIONS),  # type: ignore[arg-type]
             parallel_tool_calls=False,
         )
     except Exception as error:
@@ -134,7 +133,7 @@ def _create_reasoning_response(
 
 def _create_final_response(client: OpenAI | Any, settings: Settings, input_messages: list[Any]) -> Any:
     try:
-        return client.responses.create(
+        return client.responses.create(  # type: ignore[call-overload]
             model=settings.openai_model,
             instructions=SYSTEM_INSTRUCTIONS,
             input=input_messages,

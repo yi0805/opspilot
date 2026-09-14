@@ -1,11 +1,17 @@
 """Product domain model."""
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.campaign import Campaign
+    from app.models.inventory import Inventory
+    from app.models.sale import Sale
 
 
 class Product(Base):

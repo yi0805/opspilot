@@ -6,11 +6,9 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-import app.models  # Ensure all model metadata is registered before create_all().
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 from app.models import Campaign, Inventory, Product, Sale
-
 
 PRODUCTS = (
     ("FW-100", "Forest Builder Blocks", "Toys", "39.99", "16.50", 30),
