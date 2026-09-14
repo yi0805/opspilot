@@ -69,11 +69,12 @@ def answer_business_question(
             raise LLMConfigurationError("OPENAI_API_KEY is not configured.")
         client = OpenAI(api_key=configured_settings.openai_api_key)
 
+    input_messages: list[Any] = [{"role": "user", "content": question}]
     try:
         initial_response = client.responses.create(
             model=configured_settings.openai_model,
             instructions=SYSTEM_INSTRUCTIONS,
-            input=question,
+            input=input_messages,
             tools=list(TOOL_DEFINITIONS),
             parallel_tool_calls=False,
         )
@@ -105,17 +106,22 @@ def answer_business_question(
             status="tool_error",
         )
 
+    input_messages.extend(_item_value(initial_response, "output") or [])
+    input_messages.append(
+        {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": json.dumps(tool_result),
+        }
+    )
     try:
         final_response = client.responses.create(
             model=configured_settings.openai_model,
-            input=[
-                *(_item_value(initial_response, "output") or []),
-                {
-                    "type": "function_call_output",
-                    "call_id": call_id,
-                    "output": json.dumps(tool_result),
-                },
-            ],
+            instructions=SYSTEM_INSTRUCTIONS,
+            input=input_messages,
+            tools=list(TOOL_DEFINITIONS),
+            parallel_tool_calls=False,
+            tool_choice="none",
         )
     except Exception as error:
         raise LLMProviderError("OpenAI could not produce a final business answer.") from error

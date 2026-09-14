@@ -9,8 +9,10 @@ from app.main import app
 from app.services.llm_agent import (
     BusinessQuestionResult,
     LLMConfigurationError,
+    SYSTEM_INSTRUCTIONS,
     answer_business_question,
 )
+from app.services.llm_tools import TOOL_DEFINITIONS
 
 
 class FakeResponses:
@@ -30,6 +32,7 @@ class FakeClient:
 
 def test_agent_executes_one_real_tool_then_returns_model_answer(session: Session) -> None:
     seed_demo_data(session)
+    question = "How much stock is available for FW-100?"
     initial = SimpleNamespace(
         output=[
             SimpleNamespace(
@@ -43,7 +46,7 @@ def test_agent_executes_one_real_tool_then_returns_model_answer(session: Session
     final = SimpleNamespace(output_text="FW-100 has 22 units available.")
     client = FakeClient([initial, final])
 
-    result = answer_business_question(session, "How much stock is available for FW-100?", client=client)
+    result = answer_business_question(session, question, client=client)
 
     assert result == BusinessQuestionResult(
         answer="FW-100 has 22 units available.",
@@ -52,9 +55,17 @@ def test_agent_executes_one_real_tool_then_returns_model_answer(session: Session
     )
     assert len(client.responses.calls) == 2
     assert client.responses.calls[0]["parallel_tool_calls"] is False
-    tool_output = client.responses.calls[1]["input"][-1]
+    final_request = client.responses.calls[1]
+    final_input = final_request["input"]
+    assert final_input[0] == {"role": "user", "content": question}
+    assert initial.output[0] in final_input
+    tool_output = final_input[-1]
     assert tool_output["type"] == "function_call_output"
     assert '"available_stock": 22' in tool_output["output"]
+    assert final_request["instructions"] == SYSTEM_INSTRUCTIONS
+    assert final_request["tools"] == list(TOOL_DEFINITIONS)
+    assert final_request["parallel_tool_calls"] is False
+    assert final_request["tool_choice"] == "none"
 
 
 def test_agent_returns_controlled_result_for_multiple_tool_calls(session: Session) -> None:
