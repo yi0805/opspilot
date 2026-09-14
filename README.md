@@ -20,7 +20,7 @@ flowchart TD
     Evidence --> Agent
 ```
 
-In production, CloudFront provides one public HTTPS origin: private S3 serves the React/Vite assets by default and `/api/*` is forwarded over HTTPS to App Runner. OpenAI chooses which allowlisted tool to request; the application validates and executes that request. The LLM never accesses the database directly. Evidence is constructed by the application from actual tool results, and a recommendation is returned only when supporting evidence exists.
+In production, CloudFront is the intended public application entry point: private S3 serves the React/Vite assets by default and `/api/*` is forwarded over HTTPS to App Runner, preserving same-origin requests. App Runner's normal service URL remains directly internet-accessible by design; private ingress is intentionally not used because it would add VPC/PrivateLink infrastructure and cost. OpenAI chooses which allowlisted tool to request; the application validates and executes that request. The LLM never accesses the database directly. Evidence is constructed by the application from actual tool results, and a recommendation is returned only when supporting evidence exists.
 
 ## Key engineering safeguards
 
@@ -164,7 +164,7 @@ aws s3 sync ../../frontend/dist "s3://$bucket" --delete
 aws cloudfront create-invalidation --distribution-id $distributionId --paths "/*"
 ```
 
-The public application URL is `terraform output -raw application_url`. Later production smoke checks should call `GET /api/health` through that CloudFront URL, load the frontend, and perform one controlled agent query only after confirming the OpenAI billing and key configuration. This repository has not yet run those AWS checks or an AWS apply.
+The public application URL is `terraform output -raw application_url`. CloudFront is the intended public application entry point and preserves the frontend's same-origin `/api/*` path. App Runner's standard service URL remains directly internet-accessible by design; private ingress is intentionally not used because it would require additional VPC/PrivateLink infrastructure and cost. Later production smoke checks should call `GET /api/health` through the CloudFront URL, load the frontend, and perform one controlled agent query only after confirming the OpenAI billing and key configuration. This repository has not yet run those AWS checks or an AWS apply.
 
 To tear down a deployment, remove frontend objects if necessary and then destroy with the same immutable image tag:
 
@@ -175,6 +175,8 @@ terraform destroy -var="backend_image_tag=$imageTag"
 
 App Runner's minimum of one 0.25 vCPU / 0.5 GB instance is a deliberate availability and cost trade-off: it incurs running cost even without requests, while max instances and concurrency are capped at one and ten respectively. ECR storage, S3 storage/requests, and CloudFront delivery also incur usage-based charges. Destroy resources promptly when the demo is not needed.
 
+The S3 bucket intentionally uses `force_destroy = false`, so frontend objects are removed manually before destroy. The Terraform-managed ECR repository uses `force_delete = true`, so its images are removed with the repository. The SSM SecureString is created outside Terraform and remains unless it is manually deleted.
+
 ## Limitations
 
 - All business data is synthetic demo data.
@@ -182,5 +184,6 @@ App Runner's minimum of one 0.25 vCPU / 0.5 GB instance is a deliberate availabi
 - There is no authentication, user account system, or persistent conversation history.
 - Responses do not stream.
 - AWS deployment code is prepared but has not been applied or production-smoke-tested yet.
+- This deployment has no authentication and its App Runner/API endpoint is public. Successful agent calls consume OpenAI API usage, so it is intended only as a controlled portfolio/demo deployment; configure provider billing and usage controls before public use, and destroy it when not needed.
 
 See [ROADMAP.md](ROADMAP.md) for the planned delivery sequence.

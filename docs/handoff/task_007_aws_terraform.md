@@ -8,19 +8,19 @@ Prepare the fixed, small AWS deployment architecture for OpsPilot without creati
 
 - **Branch:** `task/007-aws-terraform`
 - **Base commit:** `aab192f35afca004630a72aa913b01157f2b5434`
-- **Final local commit:** `HEAD` on `task/007-aws-terraform` after the one Task 007 implementation commit (the immutable SHA is recorded in the completion report).
-- **Pull request:** none; no push, PR, or merge was performed.
+- **PR:** [#8](https://github.com/yi0805/opspilot/pull/8) — `Task 007: add AWS Terraform deployment`.
+- **Final verified head:** The PR branch contains the Task 007 implementation and subsequent review corrections; the final verified head SHA is reported in the completion report.
 
 ## Architecture decision
 
-CloudFront is the single public HTTPS endpoint. Its default origin is a private S3 bucket holding the React/Vite build, while its `/api/*` behavior forwards requests to the App Runner FastAPI service over HTTPS. App Runner loads a private ECR image, reads `OPENAI_API_KEY` from the exact SSM SecureString `/opspilot/prod/openai-api-key`, and uses deterministic seeded SQLite data at `/tmp/opspilot.db`.
+CloudFront is the intended public application entry point. Its default origin is a private S3 bucket holding the React/Vite build, while its `/api/*` behavior forwards requests to the App Runner FastAPI service over HTTPS. This provides same-origin frontend API calls. App Runner loads a private ECR image, reads `OPENAI_API_KEY` from the exact SSM SecureString `/opspilot/prod/openai-api-key`, and uses deterministic seeded SQLite data at `/tmp/opspilot.db`. App Runner's standard service URL remains directly internet-accessible by design; private ingress is intentionally not used because it would add VPC/PrivateLink infrastructure and cost.
 
 This preserves same-origin frontend API calls and avoids production CORS complexity. It intentionally excludes a VPC, RDS, API Gateway, Lambda, ECS, load balancer, remote state, custom domain, and CI/CD deployment workflow.
 
 ## Key changes
 
 - Added `backend/Dockerfile` and `.dockerignore` for a Python 3.12 production image. The container runs the idempotent seed command before one Uvicorn process bound to port 8080.
-- Added a small Terraform root at `infra/terraform/` for immutable ECR, narrowly scoped App Runner ECR/instance roles, SSM parameter reference, one-instance App Runner, private S3 with CloudFront Origin Access Control, and one CloudFront distribution.
+- Added a small Terraform root at `infra/terraform/` for immutable, force-deletable ECR, narrowly scoped App Runner ECR/instance roles, SSM parameter reference, one-instance App Runner, private S3 with CloudFront Origin Access Control, and one CloudFront distribution.
 - Configured CloudFront `/api/*` as HTTPS-only App Runner routing with POST support, no caching, forwarded request data except the viewer `Host` header, and a 120-second origin read timeout.
 - Configured S3 public-access blocking, bucket-owner-enforced object ownership, SSE-S3, and a distribution-scoped read-only bucket policy.
 - Added local Terraform state and variable-input ignore rules without ignoring `.terraform.lock.hcl`.
@@ -45,6 +45,8 @@ This preserves same-origin frontend API calls and avoids production CORS complex
 - Terraform deliberately does not create or store the OpenAI key. The SecureString value must be created outside Terraform before the full apply.
 - The App Runner service has a minimum of one instance and therefore has ongoing runtime cost until destroyed; it is capped at one instance and 10 concurrent requests.
 - SQLite data is ephemeral by design, safe only because it is deterministic synthetic read-only demo data.
+- The deployment has no authentication and App Runner/API ingress is public. Successful agent requests consume OpenAI API usage, so configure provider billing and usage controls before making this controlled portfolio/demo deployment public, and destroy it when not needed.
+- S3 objects require manual removal before destroy because the bucket intentionally uses `force_destroy = false`; the Terraform-managed ECR repository uses `force_delete = true`; the externally created SSM SecureString remains unless manually deleted.
 
 ## Recommended next task / exact next verification step
 

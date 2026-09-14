@@ -15,6 +15,7 @@ locals {
 
 resource "aws_ecr_repository" "backend" {
   name                 = "${local.name}-backend"
+  force_delete         = true
   image_tag_mutability = "IMMUTABLE"
 
   image_scanning_configuration {
@@ -74,6 +75,7 @@ data "aws_iam_policy_document" "apprunner_ecr_access" {
     actions = [
       "ecr:BatchCheckLayerAvailability",
       "ecr:BatchGetImage",
+      "ecr:DescribeImages",
       "ecr:GetDownloadUrlForLayer",
     ]
     resources = [aws_ecr_repository.backend.arn]
@@ -113,25 +115,6 @@ data "aws_iam_policy_document" "apprunner_instance" {
     resources = [local.openai_ssm_parameter_arn]
   }
 
-  # The AWS-managed SSM key has no stable key ARN to scope in Terraform. These
-  # conditions limit decrypt use to SSM for this exact SecureString parameter.
-  statement {
-    sid       = "DecryptOpenAiParameterThroughSsm"
-    actions   = ["kms:Decrypt"]
-    resources = ["*"]
-
-    condition {
-      test     = "StringEquals"
-      variable = "kms:ViaService"
-      values   = ["ssm.${var.aws_region}.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringLike"
-      variable = "kms:EncryptionContext:PARAMETER_ARN"
-      values   = [local.openai_ssm_parameter_arn]
-    }
-  }
 }
 
 resource "aws_iam_role_policy" "apprunner_instance" {
