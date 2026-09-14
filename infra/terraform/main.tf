@@ -50,7 +50,7 @@ data "aws_iam_policy_document" "lambda_ecr_pull" {
       "ecr:BatchGetImage",
       "ecr:GetDownloadUrlForLayer",
     ]
-    resources = [aws_ecr_repository.backend.arn]
+    resources = ["*"]
 
     principals {
       type        = "Service"
