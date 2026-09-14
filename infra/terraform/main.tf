@@ -4,6 +4,7 @@ data "aws_partition" "current" {}
 
 locals {
   name                      = var.project_name
+  lambda_function_name      = "${var.project_name}-backend"
   openai_ssm_parameter_name = "/opspilot/prod/openai-api-key"
   openai_ssm_parameter_arn  = "arn:${data.aws_partition.current.partition}:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter${local.openai_ssm_parameter_name}"
   common_tags = {
@@ -29,155 +30,146 @@ resource "aws_ecr_lifecycle_policy" "backend" {
   repository = aws_ecr_repository.backend.name
 
   policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Retain only the five most recent backend images."
-        selection = {
-          tagStatus   = "any"
-          countType   = "imageCountMoreThan"
-          countNumber = 5
-        }
-        action = {
-          type = "expire"
-        }
+    rules = [{
+      rulePriority = 1
+      description  = "Retain only the five most recent backend images."
+      selection = {
+        tagStatus   = "any"
+        countType   = "imageCountMoreThan"
+        countNumber = 5
       }
-    ]
+      action = { type = "expire" }
+    }]
   })
 }
 
-data "aws_iam_policy_document" "apprunner_ecr_assume_role" {
+data "aws_iam_policy_document" "lambda_ecr_pull" {
   statement {
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["build.apprunner.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "apprunner_ecr_access" {
-  name               = "${local.name}-apprunner-ecr-access"
-  assume_role_policy = data.aws_iam_policy_document.apprunner_ecr_assume_role.json
-  tags               = local.common_tags
-}
-
-data "aws_iam_policy_document" "apprunner_ecr_access" {
-  statement {
-    sid       = "GetEcrAuthorizationToken"
-    actions   = ["ecr:GetAuthorizationToken"]
-    resources = ["*"]
-  }
-
-  statement {
-    sid = "PullOpsPilotBackendImage"
+    sid = "AllowLambdaImageRetrieval"
     actions = [
-      "ecr:BatchCheckLayerAvailability",
       "ecr:BatchGetImage",
-      "ecr:DescribeImages",
       "ecr:GetDownloadUrlForLayer",
     ]
     resources = [aws_ecr_repository.backend.arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "AWS:SourceArn"
+      values   = ["arn:${data.aws_partition.current.partition}:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${local.lambda_function_name}"]
+    }
   }
 }
 
-resource "aws_iam_role_policy" "apprunner_ecr_access" {
-  name   = "${local.name}-ecr-pull"
-  role   = aws_iam_role.apprunner_ecr_access.id
-  policy = data.aws_iam_policy_document.apprunner_ecr_access.json
+resource "aws_ecr_repository_policy" "lambda_pull" {
+  repository = aws_ecr_repository.backend.name
+  policy     = data.aws_iam_policy_document.lambda_ecr_pull.json
 }
 
-data "aws_iam_policy_document" "apprunner_instance_assume_role" {
+data "aws_iam_policy_document" "lambda_assume_role" {
   statement {
     actions = ["sts:AssumeRole"]
 
     principals {
       type        = "Service"
-      identifiers = ["tasks.apprunner.amazonaws.com"]
+      identifiers = ["lambda.amazonaws.com"]
     }
   }
 }
 
-resource "aws_iam_role" "apprunner_instance" {
-  name               = "${local.name}-apprunner-instance"
-  assume_role_policy = data.aws_iam_policy_document.apprunner_instance_assume_role.json
+resource "aws_iam_role" "lambda_execution" {
+  name               = "${local.name}-lambda-execution"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
   tags               = local.common_tags
 }
 
-data "aws_iam_policy_document" "apprunner_instance" {
+resource "aws_cloudwatch_log_group" "backend" {
+  name              = "/aws/lambda/${local.lambda_function_name}"
+  retention_in_days = 7
+  tags              = local.common_tags
+}
+
+data "aws_iam_policy_document" "lambda_execution" {
   statement {
-    sid = "ReadOpenAiParameter"
+    sid = "WriteFunctionLogs"
     actions = [
-      "ssm:GetParameter",
-      "ssm:GetParameters",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
     ]
+    resources = ["${aws_cloudwatch_log_group.backend.arn}:*"]
+  }
+
+  statement {
+    sid       = "ReadOpenAiParameter"
+    actions   = ["ssm:GetParameter"]
     resources = [local.openai_ssm_parameter_arn]
   }
-
 }
 
-resource "aws_iam_role_policy" "apprunner_instance" {
-  name   = "${local.name}-read-openai-parameter"
-  role   = aws_iam_role.apprunner_instance.id
-  policy = data.aws_iam_policy_document.apprunner_instance.json
+resource "aws_iam_role_policy" "lambda_execution" {
+  name   = "${local.name}-lambda-execution"
+  role   = aws_iam_role.lambda_execution.id
+  policy = data.aws_iam_policy_document.lambda_execution.json
 }
 
-resource "aws_apprunner_auto_scaling_configuration_version" "backend" {
-  auto_scaling_configuration_name = "${local.name}-backend-single-instance"
-  max_concurrency                 = 10
-  max_size                        = 1
-  min_size                        = 1
-}
+resource "aws_lambda_function" "backend" {
+  function_name                  = local.lambda_function_name
+  package_type                   = "Image"
+  image_uri                      = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}"
+  role                           = aws_iam_role.lambda_execution.arn
+  architectures                  = ["x86_64"]
+  memory_size                    = 512
+  timeout                        = 110
+  reserved_concurrent_executions = 1
 
-resource "aws_apprunner_service" "backend" {
-  service_name = "${local.name}-backend"
-
-  auto_scaling_configuration_arn = aws_apprunner_auto_scaling_configuration_version.backend.arn
-
-  instance_configuration {
-    cpu               = "0.25 vCPU"
-    memory            = "0.5 GB"
-    instance_role_arn = aws_iam_role.apprunner_instance.arn
-  }
-
-  source_configuration {
-    auto_deployments_enabled = false
-
-    authentication_configuration {
-      access_role_arn = aws_iam_role.apprunner_ecr_access.arn
-    }
-
-    image_repository {
-      image_identifier      = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}"
-      image_repository_type = "ECR"
-
-      image_configuration {
-        port = "8080"
-
-        runtime_environment_variables = {
-          APP_ENV      = "production"
-          DATABASE_URL = "sqlite:////tmp/opspilot.db"
-          OPENAI_MODEL = "gpt-5.6-luna"
-        }
-
-        runtime_environment_secrets = {
-          OPENAI_API_KEY = local.openai_ssm_parameter_arn
-        }
-      }
+  environment {
+    variables = {
+      APP_ENV                   = "production"
+      DATABASE_URL              = "sqlite:////tmp/opspilot.db"
+      OPENAI_MODEL              = "gpt-5.6-luna"
+      OPENAI_SSM_PARAMETER_NAME = local.openai_ssm_parameter_name
     }
   }
 
-  health_check_configuration {
-    protocol            = "HTTP"
-    path                = "/api/health"
-    interval            = 10
-    timeout             = 5
-    healthy_threshold   = 1
-    unhealthy_threshold = 5
-  }
+  depends_on = [
+    aws_cloudwatch_log_group.backend,
+    aws_ecr_repository_policy.lambda_pull,
+    aws_iam_role_policy.lambda_execution,
+  ]
 
   tags = local.common_tags
+}
+
+resource "aws_lambda_function_url" "backend" {
+  function_name      = aws_lambda_function.backend.function_name
+  authorization_type = "NONE"
+  invoke_mode        = "BUFFERED"
+}
+
+resource "aws_lambda_permission" "public_function_url" {
+  statement_id           = "AllowPublicFunctionUrl"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.backend.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
+resource "aws_lambda_permission" "public_function_url_invoke" {
+  statement_id             = "AllowPublicInvocationThroughFunctionUrl"
+  action                   = "lambda:InvokeFunction"
+  function_name            = aws_lambda_function.backend.function_name
+  principal                = "*"
+  invoked_via_function_url = true
 }
 
 resource "aws_s3_bucket" "frontend" {
@@ -229,17 +221,9 @@ resource "aws_cloudfront_cache_policy" "static" {
   min_ttl     = 0
 
   parameters_in_cache_key_and_forwarded_to_origin {
-    cookies_config {
-      cookie_behavior = "none"
-    }
-
-    headers_config {
-      header_behavior = "none"
-    }
-
-    query_strings_config {
-      query_string_behavior = "none"
-    }
+    cookies_config { cookie_behavior = "none" }
+    headers_config { header_behavior = "none" }
+    query_strings_config { query_string_behavior = "none" }
   }
 }
 
@@ -251,39 +235,24 @@ resource "aws_cloudfront_cache_policy" "api" {
   min_ttl     = 0
 
   parameters_in_cache_key_and_forwarded_to_origin {
-    cookies_config {
-      cookie_behavior = "none"
-    }
-
-    headers_config {
-      header_behavior = "none"
-    }
-
-    query_strings_config {
-      query_string_behavior = "none"
-    }
+    cookies_config { cookie_behavior = "none" }
+    headers_config { header_behavior = "none" }
+    query_strings_config { query_string_behavior = "none" }
   }
 }
 
 resource "aws_cloudfront_origin_request_policy" "api" {
   name    = "${local.name}-api-forward-without-host"
-  comment = "Forward API request data without forwarding the viewer Host header to App Runner."
+  comment = "Forward API request data without forwarding the viewer Host header to Lambda."
 
-  cookies_config {
-    cookie_behavior = "all"
-  }
+  cookies_config { cookie_behavior = "all" }
 
   headers_config {
     header_behavior = "allExcept"
-
-    headers {
-      items = ["host"]
-    }
+    headers { items = ["host"] }
   }
 
-  query_strings_config {
-    query_string_behavior = "all"
-  }
+  query_strings_config { query_string_behavior = "all" }
 }
 
 resource "aws_cloudfront_distribution" "application" {
@@ -300,8 +269,8 @@ resource "aws_cloudfront_distribution" "application" {
   }
 
   origin {
-    domain_name = trimprefix(aws_apprunner_service.backend.service_url, "https://")
-    origin_id   = "backend-apprunner"
+    domain_name = trimprefix(aws_lambda_function_url.backend.function_url, "https://")
+    origin_id   = "backend-lambda-url"
 
     custom_origin_config {
       http_port                = 80
@@ -324,7 +293,7 @@ resource "aws_cloudfront_distribution" "application" {
 
   ordered_cache_behavior {
     path_pattern             = "/api/*"
-    target_origin_id         = "backend-apprunner"
+    target_origin_id         = "backend-lambda-url"
     viewer_protocol_policy   = "redirect-to-https"
     allowed_methods          = ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
     cached_methods           = ["GET", "HEAD"]
@@ -334,14 +303,10 @@ resource "aws_cloudfront_distribution" "application" {
   }
 
   restrictions {
-    geo_restriction {
-      restriction_type = "none"
-    }
+    geo_restriction { restriction_type = "none" }
   }
 
-  viewer_certificate {
-    cloudfront_default_certificate = true
-  }
+  viewer_certificate { cloudfront_default_certificate = true }
 
   tags = local.common_tags
 }

@@ -3,9 +3,14 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.backend.repository_url
 }
 
-output "app_runner_service_url" {
-  description = "App Runner HTTPS service URL; normally reached through CloudFront."
-  value       = aws_apprunner_service.backend.service_url
+output "lambda_function_name" {
+  description = "Lambda function name for operational verification."
+  value       = aws_lambda_function.backend.function_name
+}
+
+output "lambda_function_url" {
+  description = "Public Lambda Function URL; CloudFront is the intended application entry point."
+  value       = aws_lambda_function_url.backend.function_url
 }
 
 output "frontend_bucket_name" {
@@ -24,6 +29,6 @@ output "cloudfront_domain_name" {
 }
 
 output "application_url" {
-  description = "Generated public HTTPS application URL."
+  description = "Generated CloudFront HTTPS application URL."
   value       = "https://${aws_cloudfront_distribution.application.domain_name}"
 }

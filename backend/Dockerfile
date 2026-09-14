@@ -1,15 +1,8 @@
-FROM python:3.12-slim
+FROM public.ecr.aws/lambda/python:3.12
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+COPY pyproject.toml ${LAMBDA_TASK_ROOT}/
+COPY app ${LAMBDA_TASK_ROOT}/app
 
-WORKDIR /app
+RUN pip install --no-cache-dir ${LAMBDA_TASK_ROOT}
 
-COPY pyproject.toml ./
-COPY app ./app
-
-RUN pip install --no-cache-dir .
-
-EXPOSE 8080
-
-CMD ["sh", "-c", "python -m app.db.seed && exec uvicorn app.main:app --host 0.0.0.0 --port 8080"]
+CMD ["app.lambda_handler.handler"]

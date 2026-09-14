@@ -10,8 +10,9 @@ OpsPilot is a portfolio-quality AI business-operations agent. It turns a busines
 flowchart TD
     Browser[Browser] -->|HTTPS| CDN[CloudFront]
     CDN -->|default /*| S3[Private S3: React/Vite dist]
-    CDN -->|/api/*| Runner[App Runner: FastAPI container]
-    Runner --> Agent[LLM Agent Service]
+    CDN -->|/api/*| FunctionUrl[Lambda Function URL]
+    FunctionUrl --> Lambda[Lambda container: FastAPI / Mangum]
+    Lambda --> Agent[LLM Agent Service]
     Agent -->|reasoning requests| OpenAI[OpenAI Responses API]
     Agent --> Dispatcher[Allowlisted Tool Dispatcher]
     Dispatcher --> Queries[Business Query Services]
@@ -20,7 +21,7 @@ flowchart TD
     Evidence --> Agent
 ```
 
-In production, CloudFront is the intended public application entry point: private S3 serves the React/Vite assets by default and `/api/*` is forwarded over HTTPS to App Runner, preserving same-origin requests. App Runner's normal service URL remains directly internet-accessible by design; private ingress is intentionally not used because it would add VPC/PrivateLink infrastructure and cost. OpenAI chooses which allowlisted tool to request; the application validates and executes that request. The LLM never accesses the database directly. Evidence is constructed by the application from actual tool results, and a recommendation is returned only when supporting evidence exists.
+In production, CloudFront is the intended public application entry point: private S3 serves the React/Vite assets by default and `/api/*` is forwarded over HTTPS to a Lambda Function URL, preserving same-origin requests. The Function URL remains directly internet-accessible with `NONE` authorization by design; private ingress is intentionally not used because it would add VPC/PrivateLink infrastructure and cost. OpenAI chooses which allowlisted tool to request; the application validates and executes that request. The LLM never accesses the database directly. Evidence is constructed by the application from actual tool results, and a recommendation is returned only when supporting evidence exists.
 
 ## Key engineering safeguards
 
@@ -113,33 +114,45 @@ GitHub Actions runs these independent backend and frontend quality jobs for pull
 
 Task 007 prepares a small, destroyable AWS deployment in [`infra/terraform/`](infra/terraform/). It has not been applied to AWS yet.
 
-The architecture is intentionally limited to a private S3 frontend bucket behind CloudFront, with `/api/*` routed by the same CloudFront distribution to an App Runner FastAPI container. This preserves the frontend's relative `/api/agent/query` request path and avoids a production CORS configuration. App Runner is used instead of Lambda/API Gateway because an agent request can make several sequential OpenAI calls and should not be constrained by a short API Gateway integration timeout.
+The architecture is intentionally limited to a private S3 frontend bucket behind CloudFront, with `/api/*` routed by the same distribution to a Lambda Function URL backed by a Lambda-compatible FastAPI/Mangum container. This preserves the frontend's relative `/api/agent/query` request path and avoids a production CORS configuration. App Runner was removed because it is unavailable while this AWS account remains on its Free plan; Lambda provides request-driven execution without API Gateway.
 
-The backend image runs Python 3.12, seeds deterministic synthetic SQLite data at `sqlite:////tmp/opspilot.db`, and then starts one Uvicorn process on port 8080. The deployed database is deliberately ephemeral and read-only to the application: a single App Runner instance can safely recreate the same seed data when replaced. PostgreSQL support remains available for normal local configuration.
+The backend image runs the AWS Lambda Python 3.12 runtime. On Lambda cold start it loads the OpenAI key from the external SSM SecureString only if no process key is already set, seeds deterministic synthetic SQLite data at `sqlite:////tmp/opspilot.db`, then adapts the FastAPI application with Mangum. The deployed database is deliberately ephemeral and read-only to the application. PostgreSQL support remains available for normal local configuration.
 
-Terraform uses normal local state only. It creates an immutable, scan-on-push ECR repository (retaining five images), App Runner at 0.25 vCPU / 0.5 GB with exactly one instance, a private S3 bucket with Origin Access Control, and one CloudFront distribution. No VPC, RDS, load balancer, API Gateway, Lambda, remote state, custom domain, or CI/CD deployment pipeline is provisioned.
+Terraform uses normal local state only. It creates an immutable, scan-on-push ECR repository (retaining five images), a 512 MB Lambda image function with 110-second timeout and reserved concurrency one, a public Function URL, a private S3 bucket with Origin Access Control, and one CloudFront distribution. No VPC, RDS, load balancer, API Gateway, remote state, custom domain, or CI/CD deployment pipeline is provisioned.
 
 ### Initial deployment
 
 Prerequisites are Terraform, Docker, AWS CLI credentials for the target account, and an OpenAI key in a local environment variable. Never place the key in `terraform.tfvars`, source control, a Docker image, or a shell command literal.
 
-Set the region and create or update the SecureString outside Terraform. This command reads the value from the local environment rather than documenting it in command history:
+Set the target region:
 
 ```powershell
 $region = "ap-southeast-2"
+```
+
+The first deployment deliberately has two phases because the private ECR repository must exist before a Lambda image can be pushed. From `infra/terraform/`, authenticate the intended AWS profile, initialize Terraform, verify identity, and run a normal plan before creating the external SecureString:
+
+```powershell
+$imageTag = git -C ../.. rev-parse HEAD
+terraform init
+aws sts get-caller-identity --region $region
+terraform plan -var="backend_image_tag=$imageTag"
+```
+
+Create or update the SecureString outside Terraform. This command reads the value from the local environment rather than documenting it in command history:
+
+```powershell
 if (-not $env:OPENAI_API_KEY) { throw "Set OPENAI_API_KEY in your environment first." }
 aws ssm put-parameter --region $region --name /opspilot/prod/openai-api-key --type SecureString --value $env:OPENAI_API_KEY --overwrite
 ```
 
-The first deployment deliberately has two phases because the private ECR repository must exist before an image can be pushed. From `infra/terraform/`, initialize Terraform and bootstrap only ECR (the target is limited to this one-time bootstrap):
+Then bootstrap only ECR and its Lambda image-retrieval policy (the target is limited to this one-time bootstrap):
 
 ```powershell
-terraform init
-$imageTag = git -C ../.. rev-parse HEAD
-terraform apply -target=aws_ecr_repository.backend -target=aws_ecr_lifecycle_policy.backend -var="backend_image_tag=$imageTag"
+terraform apply -target=aws_ecr_repository.backend -target=aws_ecr_lifecycle_policy.backend -target=aws_ecr_repository_policy.lambda_pull -var="backend_image_tag=$imageTag"
 ```
 
-Then authenticate to ECR, build and push the immutable Git-SHA-tagged backend image, and perform the normal full apply:
+Then authenticate to ECR, build and push the immutable Git-SHA-tagged Lambda image, run a normal full plan, and perform the normal full apply:
 
 ```powershell
 $repository = terraform output -raw ecr_repository_url
@@ -148,6 +161,7 @@ aws ecr get-login-password --region $region | docker login --username AWS --pass
 docker build --platform linux/amd64 --tag "opspilot-backend:$imageTag" ../../backend
 docker tag "opspilot-backend:$imageTag" "${repository}:$imageTag"
 docker push "${repository}:$imageTag"
+terraform plan -var="backend_image_tag=$imageTag"
 terraform apply -var="backend_image_tag=$imageTag"
 ```
 
@@ -164,7 +178,7 @@ aws s3 sync ../../frontend/dist "s3://$bucket" --delete
 aws cloudfront create-invalidation --distribution-id $distributionId --paths "/*"
 ```
 
-The public application URL is `terraform output -raw application_url`. CloudFront is the intended public application entry point and preserves the frontend's same-origin `/api/*` path. App Runner's standard service URL remains directly internet-accessible by design; private ingress is intentionally not used because it would require additional VPC/PrivateLink infrastructure and cost. Later production smoke checks should call `GET /api/health` through the CloudFront URL, load the frontend, and perform one controlled agent query only after confirming the OpenAI billing and key configuration. This repository has not yet run those AWS checks or an AWS apply.
+The public application URL is `terraform output -raw application_url`. CloudFront is the intended public application entry point and preserves the frontend's same-origin `/api/*` path. The Function URL is directly internet-accessible by design with `NONE` authorization; private ingress is intentionally not used because it would require additional VPC/PrivateLink infrastructure and cost. Later production smoke checks should verify direct Function URL health, CloudFront `/api/health`, the frontend, and one controlled live agent request through CloudFront. This repository has not yet run those AWS checks or an AWS apply.
 
 To tear down a deployment, remove frontend objects if necessary and then destroy with the same immutable image tag:
 
@@ -173,7 +187,7 @@ aws s3 rm "s3://$bucket" --recursive
 terraform destroy -var="backend_image_tag=$imageTag"
 ```
 
-App Runner's minimum of one 0.25 vCPU / 0.5 GB instance is a deliberate availability and cost trade-off: it incurs running cost even without requests, while max instances and concurrency are capped at one and ten respectively. ECR storage, S3 storage/requests, and CloudFront delivery also incur usage-based charges. Destroy resources promptly when the demo is not needed.
+Lambda provides request-driven execution instead of an always-running backend. Reserved concurrency of one limits simultaneous Lambda executions, but does not cap total OpenAI usage over time. ECR storage, S3 storage/requests, CloudFront delivery, Lambda usage, and OpenAI usage can still incur charges. This design is intended to stay within available Free-plan services/allowances for small demo usage, not as a guarantee of zero cost; configure provider billing and usage controls and destroy resources promptly when the demo is not needed.
 
 The S3 bucket intentionally uses `force_destroy = false`, so frontend objects are removed manually before destroy. The Terraform-managed ECR repository uses `force_delete = true`, so its images are removed with the repository. The SSM SecureString is created outside Terraform and remains unless it is manually deleted.
 
@@ -184,6 +198,6 @@ The S3 bucket intentionally uses `force_destroy = false`, so frontend objects ar
 - There is no authentication, user account system, or persistent conversation history.
 - Responses do not stream.
 - AWS deployment code is prepared but has not been applied or production-smoke-tested yet.
-- This deployment has no authentication and its App Runner/API endpoint is public. Successful agent calls consume OpenAI API usage, so it is intended only as a controlled portfolio/demo deployment; configure provider billing and usage controls before public use, and destroy it when not needed.
+- This deployment has no authentication and its Lambda Function URL/API endpoint is public. Successful agent calls consume OpenAI API usage, so it is intended only as a controlled portfolio/demo deployment; configure provider billing and usage controls before public use, and destroy it when not needed.
 
 See [ROADMAP.md](ROADMAP.md) for the planned delivery sequence.
