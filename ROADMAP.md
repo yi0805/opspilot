@@ -86,6 +86,8 @@ Do not implement the LLM agent yet.
 
 ### Task 005 — Frontend Experience
 
+**Status:** Complete
+
 **Goal:** Build a clean interface for asking business questions and understanding the result.
 
 **Planned scope:**

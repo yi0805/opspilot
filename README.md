@@ -69,7 +69,7 @@ The query services live in `app.services.business_queries` and return structured
 
 The model may select the deterministic `get_product_details`, `query_sales`, `query_inventory`, and `query_campaigns` tools sequentially when a question needs more than one data source. The LLM never accesses SQLAlchemy models or the database directly: a fixed schema and dispatcher validate each selected tool and call the existing query service.
 
-The API returns a structured answer, an evidence-based recommendation when available, and evidence records produced from actual executed tool results. A maximum of four tool calls applies to each question, and repeated identical validated tool requests stop with a controlled result. All business data remains synthetic. The frontend experience for asking questions and visualizing evidence remains future Task 005 work.
+The API returns a structured answer, an evidence-based recommendation when available, and evidence records produced from actual executed tool results. A maximum of four tool calls applies to each question, and repeated identical validated tool requests stop with a controlled result. All business data remains synthetic. The frontend workspace supports asking questions and inspecting answers, recommendations, and evidence.
 
 ## Frontend local setup
 
@@ -79,6 +79,8 @@ From `frontend/`, install dependencies and start Vite on <http://localhost:5173>
 npm install
 npm run dev
 ```
+
+Start the backend separately on <http://localhost:8000>. Vite proxies `/api` requests to that local backend, so the workspace can query the agent without frontend CORS configuration. Use the supplied example questions or enter your own question to review the answer, recommendation, and traceable synthetic business evidence.
 
 Run frontend checks from `frontend/`:
 

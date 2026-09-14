@@ -1,11 +1,33 @@
-import { render, screen } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, expect, test, vi } from 'vitest'
 import App from './App'
 
-test('renders the OpsPilot MVP shell', () => {
-  render(<App />)
+const completedResult = {
+  answer: 'FW-100 sold 310 units and has 22 units available.', recommendation: 'Prioritize replenishment monitoring for FW-100.',
+  evidence: [
+    { tool: 'query_sales', arguments: { sku: 'FW-100', start_date: null, end_date: null }, data: [{ sku: 'FW-100', units_sold: 310, revenue: '12396.90', gross_profit: '7281.90' }], source: 'synthetic_business_data' as const },
+    { tool: 'query_inventory', arguments: { sku: 'FW-100' }, data: [{ sku: 'FW-100', on_hand: 28, reserved: 6, available_stock: 22, reorder_point: 30, at_or_below_reorder_point: true }], source: 'synthetic_business_data' as const },
+  ], status: 'completed' as const,
+}
+const response = (body: unknown, ok = true): Response => ({ ok, json: async () => body } as Response)
+const installFetch = (implementation: ReturnType<typeof vi.fn>) => vi.stubGlobal('fetch', implementation)
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-  expect(screen.getByRole('heading', { name: 'OpsPilot' })).toBeInTheDocument()
-  expect(screen.getByText('AI Business Operations Agent')).toBeInTheDocument()
-  expect(screen.getByText('MVP in development')).toBeInTheDocument()
+test('renders the initial workspace', () => { render(<App />); expect(screen.getByRole('heading', { name: 'Ask the business. Trace the answer.' })).toBeInTheDocument(); expect(screen.getByLabelText('Business question')).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Analyze' })).toBeDisabled(); expect(screen.getByRole('button', { name: /How much inventory is available for FW-100/ })).toBeInTheDocument() })
+test('an example prompt populates the textarea', () => { render(<App />); const prompt = 'How much inventory is available for FW-100?'; fireEvent.click(screen.getByRole('button', { name: prompt })); expect(screen.getByLabelText('Business question')).toHaveValue(prompt) })
+test('prevents blank submissions', () => { const fetchMock = vi.fn(); installFetch(fetchMock); render(<App />); fireEvent.submit(screen.getByRole('button', { name: 'Analyze' }).closest('form')!); expect(fetchMock).not.toHaveBeenCalled() })
+test('submits a question and renders answer, recommendation, and evidence', async () => {
+  const fetchMock = vi.fn().mockResolvedValue(response(completedResult)); installFetch(fetchMock); render(<App />)
+  fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' }))
+  await waitFor(() => expect(screen.getByText(completedResult.answer)).toBeInTheDocument())
+  expect(fetchMock).toHaveBeenCalledWith('/api/agent/query', expect.objectContaining({ method: 'POST', body: JSON.stringify({ question: 'Check FW-100' }) })); expect(screen.getByText(completedResult.recommendation)).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Sales' })).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Inventory' })).toBeInTheDocument(); expect(screen.getByText('310')).toBeInTheDocument(); expect(screen.getByText('22')).toBeInTheDocument()
 })
+test('shows loading state and disables duplicate submissions', async () => {
+  let resolveRequest: (value: Response) => void = () => undefined; installFetch(vi.fn().mockImplementation(() => new Promise<Response>((resolve) => { resolveRequest = resolve }))); render(<App />)
+  fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); expect(screen.getByRole('button', { name: 'Analyzing…' })).toBeDisabled(); expect(screen.getByText('Analyzing business data…')).toBeInTheDocument(); resolveRequest(response(completedResult)); await waitFor(() => expect(screen.queryByText('Analyzing business data…')).not.toBeInTheDocument())
+})
+test('does not render a recommendation panel when recommendation is null', async () => { installFetch(vi.fn().mockResolvedValue(response({ ...completedResult, recommendation: null }))); render(<App />); fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); await waitFor(() => expect(screen.getByText(completedResult.answer)).toBeInTheDocument()); expect(screen.queryByText('Recommended action')).not.toBeInTheDocument() })
+test('renders incomplete controlled statuses with any collected evidence', async () => { installFetch(vi.fn().mockResolvedValue(response({ ...completedResult, answer: 'The request hit its tool limit.', recommendation: null, status: 'tool_limit_reached' }))); render(<App />); fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); await waitFor(() => expect(screen.getByText('Analysis limit reached')).toBeInTheDocument()); expect(screen.getByText('The request hit its tool limit.')).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Sales' })).toBeInTheDocument() })
+test('shows an empty evidence result clearly', async () => { installFetch(vi.fn().mockResolvedValue(response({ ...completedResult, evidence: [{ ...completedResult.evidence[0], data: [] }] }))); render(<App />); fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); await waitFor(() => expect(screen.getByText('No matching data returned.')).toBeInTheDocument()) })
+test('shows a usable error for backend HTTP failures', async () => { installFetch(vi.fn().mockResolvedValue(response({ detail: 'OPENAI_API_KEY is not configured.' }, false))); render(<App />); fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('OpsPilot could not complete the request.')); expect(screen.getByRole('alert')).toHaveTextContent('OPENAI_API_KEY is not configured.'); expect(screen.getByRole('button', { name: 'Analyze' })).toBeEnabled() })
+test('shows a safe error for network failures', async () => { installFetch(vi.fn().mockRejectedValue(new Error('offline'))); render(<App />); fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Check your connection and try again.')) })
