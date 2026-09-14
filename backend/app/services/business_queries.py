@@ -2,11 +2,20 @@
 
 from datetime import date
 from decimal import Decimal
+from typing import TypedDict
 
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Campaign, Inventory, Product, Sale
+
+
+class SalesSummary(TypedDict):
+    sku: str
+    name: str
+    units_sold: int
+    revenue: Decimal
+    gross_profit: Decimal
 
 
 def _money(value: Decimal) -> Decimal:
@@ -51,7 +60,7 @@ def query_sales(
     if end_date is not None:
         statement = statement.where(Sale.sale_date <= end_date)
 
-    summaries: dict[str, dict[str, object]] = {}
+    summaries: dict[str, SalesSummary] = {}
     for sale in session.scalars(statement.order_by(Sale.sale_date)).unique():
         summary = summaries.setdefault(
             sale.product.sku,

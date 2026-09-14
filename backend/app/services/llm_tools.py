@@ -16,7 +16,6 @@ from app.services.business_queries import (
     query_sales,
 )
 
-
 TOOL_DEFINITIONS = (
     {
         "type": "function",
@@ -183,6 +182,7 @@ def dispatch_tool(
     """Validate and execute one allowlisted business-query function."""
     validated = _validated_arguments(tool_name, arguments)
 
+    data: object
     if tool_name == "get_product_details":
         data = get_product_details(session, validated["sku"])
     elif tool_name == "query_sales":
