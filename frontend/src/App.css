@@ -1,0 +1,23 @@
+.app-shell {
+  max-width: 640px;
+  padding: 3rem 1.5rem;
+}
+
+.eyebrow {
+  color: #2563eb;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  color: #334155;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.description {
+  margin-top: 1.5rem;
+  max-width: 36rem;
+}
