@@ -1,0 +1,5 @@
+import { EvidenceList } from './EvidenceList'
+import type { AgentQueryResult } from '../types/agent'
+
+const statusLabels: Record<Exclude<AgentQueryResult['status'], 'completed'>, string> = { tool_error: 'Analysis interrupted', tool_limit_reached: 'Analysis limit reached', duplicate_tool_call: 'Repeated data request detected' }
+export function ResultPanel({ result }: { result: AgentQueryResult }) { const statusLabel = result.status === 'completed' ? null : statusLabels[result.status]; return <section className="result-workspace" aria-labelledby="analysis-title">{statusLabel && <div className="status-notice" role="status"><strong>{statusLabel}</strong><span> The available evidence is shown below.</span></div>}<div className="result-grid"><article className="analysis-card"><p className="eyebrow">Analysis</p><h2 id="analysis-title">Business answer</h2><p className="answer">{result.answer}</p></article>{!statusLabel && result.recommendation !== null && <article className="recommendation-card"><p className="eyebrow">Recommended action</p><p>{result.recommendation}</p></article>}</div><EvidenceList evidence={result.evidence} /></section> }
