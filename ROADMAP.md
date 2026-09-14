@@ -47,6 +47,8 @@ Do not implement the LLM agent yet.
 
 ### Task 003 — LLM Tool Calling
 
+**Status:** Complete
+
 **Goal:** Allow an LLM to answer business questions by selecting and executing structured tools.
 
 **Planned tools:**
