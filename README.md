@@ -1,15 +1,60 @@
 # OpsPilot
 
-OpsPilot is an early-stage portfolio project for a focused AI Business Operations Agent. Its goal is to explore evidence-based business recommendations from structured operational data.
+OpsPilot is a focused AI Business Operations Agent portfolio project. It is being built to turn structured operational data into evidence-based business decisions.
 
 ## Status
 
-Early development. The application has not yet been scaffolded.
+The application foundation is in place. The backend provides a health endpoint and PostgreSQL-ready configuration; the frontend provides an MVP shell. Business data, AI, and agent functionality are not implemented yet.
 
-## Planned capabilities
+## Repository structure
 
-- Analyse product, sales, inventory, and marketing-campaign data.
-- Answer business operations questions through structured tool use.
-- Produce evidence-based recommendations for operational priorities.
+```text
+backend/    FastAPI application, configuration, SQLAlchemy foundation, and pytest tests
+frontend/   React, TypeScript, Vite application and Vitest tests
+docs/       Task handoffs
+```
+
+## Backend local setup
+
+From `backend/`, create and activate a virtual environment, then install the project with development dependencies:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+```
+
+Copy `.env.example` to `.env` if you need to override the safe development defaults. Supported settings are `APP_ENV` and `DATABASE_URL`.
+
+Run the API on <http://localhost:8000>:
+
+```powershell
+uvicorn app.main:app --reload
+```
+
+The health endpoint is `GET /api/health` at <http://localhost:8000/api/health>. It returns `{"status":"ok"}` and does not require PostgreSQL to be running.
+
+Run backend tests from `backend/`:
+
+```powershell
+pytest
+```
+
+## Frontend local setup
+
+From `frontend/`, install dependencies and start Vite on <http://localhost:5173>:
+
+```powershell
+npm install
+npm run dev
+```
+
+Run frontend checks from `frontend/`:
+
+```powershell
+npm test -- --run
+npm run lint
+npm run build
+```
 
 See [ROADMAP.md](ROADMAP.md) for the planned delivery sequence.

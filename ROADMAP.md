@@ -4,6 +4,8 @@
 
 ### Task 001 — Application Scaffold
 
+**Status:** Complete
+
 **Goal:** Establish the backend/frontend application structure.
 
 **Planned scope:**
