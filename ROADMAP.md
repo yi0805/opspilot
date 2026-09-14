@@ -127,6 +127,8 @@ Keep the UI polished but small.
 
 ### Task 007 — AWS and Terraform
 
+**Status:** In Progress
+
 **Goal:** Deploy a verified working version using a small, cost-conscious AWS architecture.
 
 **Planned scope:**

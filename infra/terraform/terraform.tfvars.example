@@ -1,0 +1,4 @@
+# Copy this file to terraform.tfvars and replace the image tag after pushing it.
+# This tag is the current repository base commit only; it is not a secret and
+# does not imply that an image with this tag exists in ECR.
+backend_image_tag = "aab192f35afca004630a72aa913b01157f2b5434"
