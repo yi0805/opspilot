@@ -162,7 +162,13 @@ Then authenticate to ECR, build and push the immutable Git-SHA-tagged Lambda ima
 $repository = terraform output -raw ecr_repository_url
 $registry = $repository.Split('/')[0]
 aws ecr get-login-password | docker login --username AWS --password-stdin $registry
-docker build --platform linux/amd64 --tag "opspilot-backend:$imageTag" ../../backend
+docker buildx build `
+  --platform linux/amd64 `
+  --provenance=false `
+  --sbom=false `
+  --load `
+  --tag "opspilot-backend:$imageTag" `
+  ../../backend
 docker tag "opspilot-backend:$imageTag" "${repository}:$imageTag"
 docker push "${repository}:$imageTag"
 terraform plan -var="backend_image_tag=$imageTag"
