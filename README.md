@@ -118,7 +118,7 @@ The architecture is intentionally limited to a private S3 frontend bucket behind
 
 The backend image runs the AWS Lambda Python 3.12 runtime. On Lambda cold start it loads the OpenAI key from the external SSM SecureString only if no process key is already set, seeds deterministic synthetic SQLite data at `sqlite:////tmp/opspilot.db`, then adapts the FastAPI application with Mangum. The deployed database is deliberately ephemeral and read-only to the application. PostgreSQL support remains available for normal local configuration.
 
-Terraform uses normal local state only. It creates an immutable, scan-on-push ECR repository (retaining five images), a 512 MB Lambda image function with 110-second timeout and reserved concurrency one, a public Function URL, a private S3 bucket with Origin Access Control, and one CloudFront distribution. No VPC, RDS, load balancer, API Gateway, remote state, custom domain, or CI/CD deployment pipeline is provisioned.
+Terraform uses normal local state only. It creates an immutable, scan-on-push ECR repository (retaining five images), a 512 MB Lambda image function with 110-second timeout and no per-function reserved concurrency, a public Function URL, a private S3 bucket with Origin Access Control, and one CloudFront distribution. Lambda uses the account's available unreserved concurrency, which avoids an unsupported reservation on the current low-quota AWS account. No VPC, RDS, load balancer, API Gateway, remote state, custom domain, or CI/CD deployment pipeline is provisioned.
 
 ### Initial deployment
 
@@ -197,7 +197,7 @@ aws s3 rm "s3://$bucket" --recursive
 terraform destroy -var="backend_image_tag=$imageTag"
 ```
 
-Lambda provides request-driven execution instead of an always-running backend. Reserved concurrency of one limits simultaneous Lambda executions, but does not cap total OpenAI usage over time. ECR storage, S3 storage/requests, CloudFront delivery, Lambda usage, and OpenAI usage can still incur charges. This design is intended to stay within available Free-plan services/allowances for small demo usage, not as a guarantee of zero cost; configure provider billing and usage controls and destroy resources promptly when the demo is not needed.
+Lambda provides request-driven execution instead of an always-running backend. This deployment does not configure per-function reserved concurrency, so Lambda uses the account's available unreserved concurrency; this avoids an unsupported reservation on the current low-quota AWS account. It does not create a cumulative OpenAI spending cap. ECR storage, S3 storage/requests, CloudFront delivery, Lambda usage, and OpenAI usage can still incur charges. This design is intended to stay within available Free-plan services/allowances for small demo usage, not as a guarantee of zero cost; configure provider billing and usage controls and destroy resources promptly when the demo is not needed.
 
 The S3 bucket intentionally uses `force_destroy = false`, so frontend objects are removed manually before destroy. The Terraform-managed ECR repository uses `force_delete = true`, so its images are removed with the repository. The SSM SecureString is created outside Terraform and remains unless it is manually deleted.
 

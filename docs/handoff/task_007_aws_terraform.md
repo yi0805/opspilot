@@ -22,7 +22,7 @@ The Function URL uses public `NONE` authorization by design. It remains directly
 - Replaced App Runner resources, IAM roles, outputs, and CloudFront origin with a Lambda container-image function, Function URL, two public Function URL permissions, execution role, ECR retrieval policy, and seven-day CloudWatch log group.
 - Added a Python 3.12 Lambda image, Mangum handler, and a cold-start-only SSM SecureString loader. The loader reads `/opspilot/prod/openai-api-key` only when `OPENAI_API_KEY` is absent, then seeds deterministic SQLite before importing FastAPI.
 - Preserved immutable, scan-on-push, force-deletable ECR; private S3/OAC; no API caching; and CloudFront's 120-second API origin timeout.
-- Restricted Lambda to 512 MB, a 110-second timeout, x86_64 image execution, and reserved concurrency of one.
+- Restricted Lambda to 512 MB, a 110-second timeout, and x86_64 image execution. The deployment does not configure per-function reserved concurrency, so Lambda uses the account's available unreserved concurrency; this avoids an unsupported reservation on the current low-quota AWS account and does not cap cumulative OpenAI spending.
 
 ## Local verification
 
@@ -36,7 +36,7 @@ The Function URL uses public `NONE` authorization by design. It remains directly
 - **Implemented locally:** Lambda deployment code, image packaging, runtime secret boundary, tests, documentation, and local-state configuration.
 - **NOT YET deployed:** no Terraform apply, ECR push, SSM write, S3 sync, CloudFront invalidation, or other AWS mutation has occurred.
 - The OpenAI key remains outside Terraform state in an externally managed SecureString.
-- The Lambda Function URL/API has no authentication. Successful public agent requests consume OpenAI API usage. Reserved concurrency of one limits simultaneous function executions but does not cap total OpenAI usage over time; provider billing and usage controls still matter.
+- The Lambda Function URL/API has no authentication. Successful public agent requests consume OpenAI API usage. This deployment does not configure per-function reserved concurrency, so Lambda uses the account's available unreserved concurrency; this avoids an unsupported reservation on the current low-quota AWS account and does not cap cumulative OpenAI spending. Provider billing and usage controls still matter.
 - The deployment is intended as a controlled portfolio/demo environment designed to stay within available Free-plan services/allowances for small demo usage, not as a guarantee of zero cost. Destroy it when it is not needed.
 - S3 frontend objects must be manually removed before destroy because `force_destroy = false`. Terraform destroys the Lambda, Function URL, permissions, CloudFront, ECR, and other managed infrastructure; ECR uses `force_delete = true`. The external SSM parameter remains unless deliberately deleted manually.
 

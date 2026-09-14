@@ -109,14 +109,13 @@ resource "aws_iam_role_policy" "lambda_execution" {
 }
 
 resource "aws_lambda_function" "backend" {
-  function_name                  = local.lambda_function_name
-  package_type                   = "Image"
-  image_uri                      = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}"
-  role                           = aws_iam_role.lambda_execution.arn
-  architectures                  = ["x86_64"]
-  memory_size                    = 512
-  timeout                        = 110
-  reserved_concurrent_executions = 1
+  function_name = local.lambda_function_name
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}"
+  role          = aws_iam_role.lambda_execution.arn
+  architectures = ["x86_64"]
+  memory_size   = 512
+  timeout       = 110
 
   environment {
     variables = {
