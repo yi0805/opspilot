@@ -4,7 +4,7 @@ OpsPilot is a focused AI Business Operations Agent portfolio project. It is bein
 
 ## Status
 
-The application foundation and a synthetic business-data layer are in place. The backend provides a health endpoint plus deterministic product, sales, inventory, and campaign queries. AI and agent functionality are not implemented yet.
+The application foundation, synthetic business-data layer, and a constrained OpenAI tool-calling flow are in place. The backend provides a health endpoint plus deterministic product, sales, inventory, and campaign queries.
 
 ## Repository structure
 
@@ -24,7 +24,7 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
-Copy `.env.example` to `.env` if you need to override the safe development defaults. Supported settings are `APP_ENV` and `DATABASE_URL`.
+Copy `.env.example` to `.env` if you need to override the safe development defaults. Supported settings are `APP_ENV`, `DATABASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL`. The default model setting is `gpt-5.6-luna`; provide your own OpenAI API key locally and never commit it.
 
 Run the API on <http://localhost:8000>:
 
@@ -57,7 +57,19 @@ $env:DATABASE_URL = "sqlite:///./opspilot-demo.db"
 python -m app.db.seed
 ```
 
-The query services live in `app.services.business_queries` and return structured Python data for future AI tool wrapping; they are not API endpoints or LLM tools.
+The query services live in `app.services.business_queries` and return structured Python data. They are wrapped only by the constrained Task 003 tool dispatcher, not exposed as direct business-data API endpoints.
+
+## OpenAI tool calling
+
+`POST /api/agent/query` accepts one business question, for example:
+
+```json
+{"question":"How much stock is available for FW-100?"}
+```
+
+The model may select exactly one of four deterministic tools: `get_product_details`, `query_sales`, `query_inventory`, or `query_campaigns`. The LLM never accesses SQLAlchemy models or the database directly: a fixed schema and dispatcher validate its selected tool and call the existing query service.
+
+Task 003 intentionally supports one tool-selection/execution cycle only. Questions needing multiple data sources, recommendations, or evidence traceability are reserved for Task 004.
 
 ## Frontend local setup
 
