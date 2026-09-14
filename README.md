@@ -4,7 +4,7 @@ OpsPilot is a focused AI Business Operations Agent portfolio project. It is bein
 
 ## Status
 
-The application foundation, synthetic business-data layer, and a constrained OpenAI tool-calling flow are in place. The backend provides a health endpoint plus deterministic product, sales, inventory, and campaign queries.
+The application foundation, synthetic business-data layer, and a controlled OpenAI multi-tool reasoning flow are in place. The backend provides a health endpoint plus deterministic product, sales, inventory, and campaign queries.
 
 ## Repository structure
 
@@ -57,19 +57,19 @@ $env:DATABASE_URL = "sqlite:///./opspilot-demo.db"
 python -m app.db.seed
 ```
 
-The query services live in `app.services.business_queries` and return structured Python data. They are wrapped only by the constrained Task 003 tool dispatcher, not exposed as direct business-data API endpoints.
+The query services live in `app.services.business_queries` and return structured Python data. They are wrapped only by the constrained Task 004 tool dispatcher, not exposed as direct business-data API endpoints.
 
-## OpenAI tool calling
+## OpenAI business reasoning
 
 `POST /api/agent/query` accepts one business question, for example:
 
 ```json
-{"question":"How much stock is available for FW-100?"}
+{"question":"Compare FW-100 sales and inventory. Is there a replenishment risk and what should we do?"}
 ```
 
-The model may select exactly one of four deterministic tools: `get_product_details`, `query_sales`, `query_inventory`, or `query_campaigns`. The LLM never accesses SQLAlchemy models or the database directly: a fixed schema and dispatcher validate its selected tool and call the existing query service.
+The model may select the deterministic `get_product_details`, `query_sales`, `query_inventory`, and `query_campaigns` tools sequentially when a question needs more than one data source. The LLM never accesses SQLAlchemy models or the database directly: a fixed schema and dispatcher validate each selected tool and call the existing query service.
 
-Task 003 intentionally supports one tool-selection/execution cycle only. Questions needing multiple data sources, recommendations, or evidence traceability are reserved for Task 004.
+The API returns a structured answer, an evidence-based recommendation when available, and evidence records produced from actual executed tool results. A maximum of four tool calls applies to each question, and repeated identical validated tool requests stop with a controlled result. All business data remains synthetic. The frontend experience for asking questions and visualizing evidence remains future Task 005 work.
 
 ## Frontend local setup
 

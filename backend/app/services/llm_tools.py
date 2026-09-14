@@ -157,6 +157,13 @@ def _validated_arguments(tool_name: str, arguments: str | dict[str, Any]) -> dic
     raise ToolDispatchError(f"Unsupported tool: {tool_name}.")
 
 
+def validate_tool_arguments(
+    tool_name: str, arguments: str | dict[str, Any]
+) -> dict[str, Any]:
+    """Validate a tool request and return stable JSON-compatible arguments."""
+    return json_safe(_validated_arguments(tool_name, arguments))
+
+
 def json_safe(value: Any) -> Any:
     """Convert deterministic business-query values to JSON-compatible primitives."""
     if isinstance(value, Decimal):
