@@ -13,7 +13,7 @@ const response = (body: unknown, ok = true): Response => ({ ok, json: async () =
 const installFetch = (implementation: ReturnType<typeof vi.fn>) => vi.stubGlobal('fetch', implementation)
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-test('renders the initial workspace', () => { render(<App />); expect(screen.getByRole('heading', { name: 'Ask the business. Trace the answer.' })).toBeInTheDocument(); expect(screen.getByLabelText('Business question')).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Analyze' })).toBeDisabled(); expect(screen.getByRole('button', { name: /How much inventory is available for FW-100/ })).toBeInTheDocument() })
+test('renders the initial workspace', () => { render(<App />); expect(screen.getByRole('heading', { name: 'Ask the business. Trace the answer.' })).toBeInTheDocument(); expect(screen.getByLabelText('Business question')).toBeRequired(); expect(screen.getByRole('button', { name: 'Analyze' })).toBeDisabled(); expect(screen.getByRole('button', { name: /How much inventory is available for FW-100/ })).toBeInTheDocument() })
 test('an example prompt populates the textarea', () => { render(<App />); const prompt = 'How much inventory is available for FW-100?'; fireEvent.click(screen.getByRole('button', { name: prompt })); expect(screen.getByLabelText('Business question')).toHaveValue(prompt) })
 test('prevents blank submissions', () => { const fetchMock = vi.fn(); installFetch(fetchMock); render(<App />); fireEvent.submit(screen.getByRole('button', { name: 'Analyze' }).closest('form')!); expect(fetchMock).not.toHaveBeenCalled() })
 test('submits a question and renders answer, recommendation, and evidence', async () => {
