@@ -149,11 +149,13 @@ def test_agent_executes_two_real_tools_and_preserves_accumulated_context(session
     assert final_request["text"] == {"format": FINAL_OUTPUT_SCHEMA}
 
 
-def test_agent_returns_completed_structured_no_tool_answer(session: Session) -> None:
+def test_agent_discards_recommendation_without_tool_evidence(session: Session) -> None:
     client = FakeClient(
         [
             no_tool_response(),
-            structured_final("I can help with the available synthetic business data."),
+            structured_final(
+                "I can help with the available synthetic business data.", "Increase inventory."
+            ),
         ]
     )
 
@@ -193,6 +195,7 @@ def test_agent_returns_no_data_evidence_without_fabricating_metrics(session: Ses
             no_tool_response(),
             structured_final(
                 "No matching inventory data was found for UNKNOWN.",
+                "Increase inventory.",
                 limitations=["No matching inventory data was returned."],
             ),
         ]

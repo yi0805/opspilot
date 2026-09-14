@@ -112,6 +112,11 @@ def _response_output(response: Any) -> list[Any]:
     return output
 
 
+def _has_supporting_evidence(evidence: list[EvidenceRecord]) -> bool:
+    """Return whether an executed business tool returned non-empty data."""
+    return any(bool(record.data) for record in evidence)
+
+
 def _create_reasoning_response(
     client: OpenAI | Any, settings: Settings, input_messages: list[Any]
 ) -> Any:
@@ -173,7 +178,9 @@ def answer_business_question(
             final_payload = _final_payload(final_response)
             return BusinessQuestionResult(
                 answer=final_payload.answer,
-                recommendation=final_payload.recommendation,
+                recommendation=(
+                    final_payload.recommendation if _has_supporting_evidence(evidence) else None
+                ),
                 evidence=evidence,
             )
 
