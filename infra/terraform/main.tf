@@ -137,24 +137,8 @@ resource "aws_lambda_function" "backend" {
 
 resource "aws_lambda_function_url" "backend" {
   function_name      = aws_lambda_function.backend.function_name
-  authorization_type = "NONE"
+  authorization_type = "AWS_IAM"
   invoke_mode        = "BUFFERED"
-}
-
-resource "aws_lambda_permission" "public_function_url" {
-  statement_id           = "AllowPublicFunctionUrl"
-  action                 = "lambda:InvokeFunctionUrl"
-  function_name          = aws_lambda_function.backend.function_name
-  principal              = "*"
-  function_url_auth_type = "NONE"
-}
-
-resource "aws_lambda_permission" "public_function_url_invoke" {
-  statement_id             = "AllowPublicInvocationThroughFunctionUrl"
-  action                   = "lambda:InvokeFunction"
-  function_name            = aws_lambda_function.backend.function_name
-  principal                = "*"
-  invoked_via_function_url = true
 }
 
 resource "aws_s3_bucket" "frontend" {
@@ -194,6 +178,14 @@ resource "aws_cloudfront_origin_access_control" "frontend" {
   name                              = "${local.name}-frontend-s3"
   description                       = "CloudFront access to the private OpsPilot frontend bucket."
   origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+resource "aws_cloudfront_origin_access_control" "backend" {
+  name                              = "${local.name}-backend-lambda-url"
+  description                       = "CloudFront signed access to the OpsPilot Lambda Function URL."
+  origin_access_control_origin_type = "lambda"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
 }
@@ -258,7 +250,8 @@ resource "aws_cloudfront_distribution" "application" {
       trimprefix(aws_lambda_function_url.backend.function_url, "https://"),
       "/",
     )
-    origin_id = "backend-lambda-url"
+    origin_id                = "backend-lambda-url"
+    origin_access_control_id = aws_cloudfront_origin_access_control.backend.id
 
     custom_origin_config {
       http_port                = 80
@@ -297,6 +290,27 @@ resource "aws_cloudfront_distribution" "application" {
   viewer_certificate { cloudfront_default_certificate = true }
 
   tags = local.common_tags
+}
+
+# These permissions depend on the distribution ARN, but the distribution does
+# not depend on them. That one-way dependency lets CloudFront use the Lambda
+# origin and OAC without introducing a Terraform graph cycle.
+resource "aws_lambda_permission" "cloudfront_function_url" {
+  statement_id           = "AllowCloudFrontFunctionUrl"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.backend.function_name
+  principal              = "cloudfront.amazonaws.com"
+  source_arn             = aws_cloudfront_distribution.application.arn
+  function_url_auth_type = "AWS_IAM"
+}
+
+resource "aws_lambda_permission" "cloudfront_function_url_invoke" {
+  statement_id             = "AllowCloudFrontInvocationThroughFunctionUrl"
+  action                   = "lambda:InvokeFunction"
+  function_name            = aws_lambda_function.backend.function_name
+  principal                = "cloudfront.amazonaws.com"
+  source_arn               = aws_cloudfront_distribution.application.arn
+  invoked_via_function_url = true
 }
 
 data "aws_iam_policy_document" "frontend_bucket" {

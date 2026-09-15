@@ -20,11 +20,18 @@ test('submits a question and renders answer, recommendation, and evidence', asyn
   const fetchMock = vi.fn().mockResolvedValue(response(completedResult)); installFetch(fetchMock); render(<App />)
   fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' }))
   await waitFor(() => expect(screen.getByText(completedResult.answer)).toBeInTheDocument())
-  expect(fetchMock).toHaveBeenCalledWith('/api/agent/query', expect.objectContaining({ method: 'POST', body: JSON.stringify({ question: 'Check FW-100' }) })); expect(screen.getByText(completedResult.recommendation)).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Sales' })).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Inventory' })).toBeInTheDocument(); expect(screen.getByText('310')).toBeInTheDocument(); expect(screen.getByText('22')).toBeInTheDocument()
+  expect(fetchMock).toHaveBeenCalledWith('/api/agent/query', expect.objectContaining({
+    method: 'POST',
+    body: JSON.stringify({ question: 'Check FW-100' }),
+    headers: {
+      'Content-Type': 'application/json',
+      'x-amz-content-sha256': '0b139f2f52525b6e35f841f5310c5a380c3e5e527f5e7c7d53041d313f5fc129',
+    },
+  })); expect(screen.getByText(completedResult.recommendation)).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Sales' })).toBeInTheDocument(); expect(screen.getByRole('heading', { name: 'Inventory' })).toBeInTheDocument(); expect(screen.getByText('310')).toBeInTheDocument(); expect(screen.getByText('22')).toBeInTheDocument()
 })
 test('shows loading state and disables duplicate submissions', async () => {
-  let resolveRequest: (value: Response) => void = () => undefined; installFetch(vi.fn().mockImplementation(() => new Promise<Response>((resolve) => { resolveRequest = resolve }))); render(<App />)
-  fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); expect(screen.getByRole('button', { name: 'Analyzing…' })).toBeDisabled(); expect(screen.getByRole('button', { name: /How much inventory is available for FW-100/ })).toBeDisabled(); expect(screen.getByText('Analyzing business data…')).toBeInTheDocument(); resolveRequest(response(completedResult)); await waitFor(() => expect(screen.queryByText('Analyzing business data…')).not.toBeInTheDocument())
+  let resolveRequest: (value: Response) => void = () => undefined; const fetchMock = vi.fn().mockImplementation(() => new Promise<Response>((resolve) => { resolveRequest = resolve })); installFetch(fetchMock); render(<App />)
+  fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Check FW-100' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); expect(screen.getByRole('button', { name: 'Analyzing…' })).toBeDisabled(); expect(screen.getByRole('button', { name: /How much inventory is available for FW-100/ })).toBeDisabled(); expect(screen.getByText('Analyzing business data…')).toBeInTheDocument(); await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1)); resolveRequest(response(completedResult)); await waitFor(() => expect(screen.queryByText('Analyzing business data…')).not.toBeInTheDocument())
 })
 test('clears stale results when a question is changed or a follow-up analysis fails', async () => {
   let rejectSecondRequest: (error: Error) => void = () => undefined
@@ -32,7 +39,7 @@ test('clears stale results when a question is changed or a follow-up analysis fa
   installFetch(fetchMock); render(<App />)
   fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Question A' } }); fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); await waitFor(() => expect(screen.getByText(completedResult.answer)).toBeInTheDocument())
   fireEvent.change(screen.getByLabelText('Business question'), { target: { value: 'Question B' } }); expect(screen.queryByText(completedResult.answer)).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); expect(screen.queryByText(completedResult.answer)).not.toBeInTheDocument(); rejectSecondRequest(new Error('offline'))
+  fireEvent.click(screen.getByRole('button', { name: 'Analyze' })); expect(screen.queryByText(completedResult.answer)).not.toBeInTheDocument(); await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2)); rejectSecondRequest(new Error('offline'))
   await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument()); expect(screen.queryByText(completedResult.answer)).not.toBeInTheDocument()
 })
 test('selecting an example after a result clears the stale result', async () => {
