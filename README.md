@@ -21,7 +21,7 @@ flowchart TD
     Evidence --> Agent
 ```
 
-In production, CloudFront is the intended public application entry point: private S3 serves the React/Vite assets by default and `/api/*` is forwarded over HTTPS to a Lambda Function URL, preserving same-origin requests. The Function URL remains directly internet-accessible with `NONE` authorization by design; private ingress is intentionally not used because it would add VPC/PrivateLink infrastructure and cost. OpenAI chooses which allowlisted tool to request; the application validates and executes that request. The LLM never accesses the database directly. Evidence is constructed by the application from actual tool results, and a recommendation is returned only when supporting evidence exists.
+CloudFront is the intended public application entry point: private S3 serves the React/Vite assets by default and `/api/*` is forwarded over HTTPS to a Lambda Function URL, preserving same-origin requests. Task 008 prepares CloudFront-only Lambda access: the Function URL will use `AWS_IAM`, CloudFront will sign Lambda-origin requests through Origin Access Control, and the Function URL policy will allow only the intended distribution. This change has not been deployed, so the current Task 007 deployment remains directly accessible until the Task 008 Terraform is applied. OpenAI chooses which allowlisted tool to request; the application validates and executes that request. The LLM never accesses the database directly. Evidence is constructed by the application from actual tool results, and a recommendation is returned only when supporting evidence exists.
 
 ## Key engineering safeguards
 

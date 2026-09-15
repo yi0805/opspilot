@@ -9,7 +9,7 @@ output "lambda_function_name" {
 }
 
 output "lambda_function_url" {
-  description = "Public Lambda Function URL; CloudFront is the intended application entry point."
+  description = "Lambda Function URL restricted to signed CloudFront origin requests."
   value       = aws_lambda_function_url.backend.function_url
 }
 

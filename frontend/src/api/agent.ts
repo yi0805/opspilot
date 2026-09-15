@@ -26,10 +26,23 @@ function errorDetail(value: unknown): string | null {
   return typeof detail === 'string' && detail.trim() ? detail : null
 }
 
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 export async function queryAgent(question: string): Promise<AgentQueryResult> {
+  const requestBody = JSON.stringify({ question })
   let response: Response
   try {
-    response = await fetch('/api/agent/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question }) })
+    response = await fetch('/api/agent/query', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-amz-content-sha256': await sha256Hex(requestBody),
+      },
+      body: requestBody,
+    })
   } catch {
     throw new AgentApiError('Check your connection and try again.')
   }
