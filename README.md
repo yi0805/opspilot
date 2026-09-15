@@ -10,7 +10,7 @@ OpsPilot is a portfolio-quality AI business-operations agent. It turns a busines
 flowchart TD
     Browser[Browser] -->|HTTPS| CDN[CloudFront]
     CDN -->|default /*| S3[Private S3: React/Vite dist]
-    CDN -->|/api/*| FunctionUrl[Lambda Function URL]
+    CDN -->|/api/*| FunctionUrl[AWS_IAM Lambda Function URL]
     FunctionUrl --> Lambda[Lambda container: FastAPI / Mangum]
     Lambda --> Agent[LLM Agent Service]
     Agent -->|reasoning requests| OpenAI[OpenAI Responses API]
@@ -21,7 +21,7 @@ flowchart TD
     Evidence --> Agent
 ```
 
-CloudFront is the intended public application entry point: private S3 serves the React/Vite assets by default and `/api/*` is forwarded over HTTPS to a Lambda Function URL, preserving same-origin requests. Task 008 prepares CloudFront-only Lambda access: the Function URL will use `AWS_IAM`, CloudFront will sign Lambda-origin requests through Origin Access Control, and the Function URL policy will allow only the intended distribution. This change has not been deployed, so the current Task 007 deployment remains directly accessible until the Task 008 Terraform is applied. OpenAI chooses which allowlisted tool to request; the application validates and executes that request. The LLM never accesses the database directly. Evidence is constructed by the application from actual tool results, and a recommendation is returned only when supporting evidence exists.
+CloudFront is the public application entry point: private S3 serves the React/Vite assets by default and `/api/*` is forwarded over HTTPS to a Lambda Function URL, preserving same-origin requests. The Function URL uses `AWS_IAM`; CloudFront signs Lambda-origin requests through Origin Access Control, and its policy is scoped to the application distribution. Direct unsigned Function URL requests are denied. OpenAI chooses which allowlisted tool to request; the application validates and executes that request. The LLM never accesses the database directly. Evidence is constructed by the application from actual tool results, and a recommendation is returned only when supporting evidence exists.
 
 ## Key engineering safeguards
 
@@ -118,7 +118,7 @@ The architecture is intentionally limited to a private S3 frontend bucket behind
 
 The backend image runs the AWS Lambda Python 3.12 runtime. On Lambda cold start it loads the OpenAI key from the external SSM SecureString only if no process key is already set, seeds deterministic synthetic SQLite data at `sqlite:////tmp/opspilot.db`, then adapts the FastAPI application with Mangum. The deployed database is deliberately ephemeral and read-only to the application. PostgreSQL support remains available for normal local configuration.
 
-Terraform uses normal local state only. It created an immutable, scan-on-push ECR repository (retaining five images), a 512 MB, 110-second, x86_64 Lambda image function, a public Function URL, a private S3 bucket with Origin Access Control, and one CloudFront distribution. No per-function reserved concurrency is configured: Lambda uses the account's available unreserved concurrency because the account quota is 10 and AWS must retain unreserved capacity. No VPC, RDS, load balancer, API Gateway, remote state, custom domain, or CI/CD deployment pipeline is provisioned.
+Terraform uses normal local state only. It created an immutable, scan-on-push ECR repository (retaining five images), a 512 MB, 110-second, x86_64 Lambda image function with an `AWS_IAM` Function URL, a private S3 bucket with Origin Access Control, and one CloudFront distribution. CloudFront signs Lambda-origin requests through a dedicated OAC; direct unsigned Function URL requests are denied. No per-function reserved concurrency is configured: Lambda uses the account's available unreserved concurrency because the account quota is 10 and AWS must retain unreserved capacity. No VPC, RDS, load balancer, API Gateway, remote state, custom domain, or CI/CD deployment pipeline is provisioned.
 
 The deployed backend artifact is image tag `992490a6220fe6b4ef3e27b4ebc68b9e8914bc93` (digest `sha256:b9fb97ec1431b31242b8a452070285c127a57856c5d6e14e7d6c8a4b2c2f889e`). The private frontend bucket contains the built React/Vite deployment, and CloudFront routes `/*` to S3 and `/api/*` to the Lambda Function URL.
 
@@ -190,13 +190,13 @@ aws s3 sync ../../frontend/dist "s3://$bucket" --delete
 aws cloudfront create-invalidation --distribution-id $distributionId --paths "/*"
 ```
 
-The public application URL is `terraform output -raw application_url`. CloudFront is the intended public application entry point and preserves the frontend's same-origin `/api/*` path. The Function URL is directly internet-accessible by design with `NONE` authorization; private ingress is intentionally not used because it would require additional VPC/PrivateLink infrastructure and cost.
+The public application URL is `terraform output -raw application_url`. CloudFront preserves the frontend's same-origin `/api/*` path and is the public application entry point. Its Lambda origin uses OAC-signed requests to the `AWS_IAM` Function URL; direct unsigned Function URL access is denied.
 
 ### Verified deployment
 
-Terraform infrastructure was applied successfully and its final infrastructure plan was clean before frontend deployment. The frontend was built and synced to the private S3 bucket (3 files, 234,991 bytes), and CloudFront invalidation `I2B19UQY6PHETREMQSMKLBL79R` completed.
+Terraform infrastructure was applied successfully. Task 008 then enabled `AWS_IAM` on the Function URL, attached the Lambda-origin OAC, removed legacy wildcard Function URL policy statements, and finished with a clean Terraform plan. The production frontend was rebuilt and deployed to the private S3 bucket; CloudFront invalidation `IC3U2HWVGFYEU6WGF7447MK65Y` completed.
 
-Production smoke checks passed: direct Lambda Function URL `GET /api/health`, CloudFront `GET /api/health`, and CloudFront `GET /` all returned HTTP 200; the OpsPilot page and its JS/CSS assets were verified. One controlled live request through `/api/agent/query` also completed successfully in about 21.3 seconds. It used `query_sales` and `query_inventory` and correctly identified FW-100 as below its reorder point, with evidence-backed advice to verify or expedite inbound stock and continue replenishment.
+Production smoke checks passed: CloudFront `GET /api/health` and CloudFront `GET /` both returned HTTP 200, while direct unsigned Function URL health and invalid agent requests returned HTTP 403. One controlled live request through CloudFront `/api/agent/query` completed successfully in about 21.5 seconds. It used `query_sales` and `query_inventory` and correctly identified FW-100 as below its reorder point, with evidence-backed advice to verify or expedite inbound stock and continue replenishment.
 
 To tear down a deployment, remove frontend objects if necessary and then destroy with the same immutable image tag:
 
@@ -215,7 +215,7 @@ The S3 bucket intentionally uses `force_destroy = false`, so frontend objects ar
 - A local OpenAI API key is needed for live agent questions.
 - There is no authentication, user account system, or persistent conversation history.
 - Responses do not stream.
-- The AWS deployment is a controlled demo environment, not a hardened production service: the Function URL/API is public and unauthenticated, and the Lambda `/tmp` SQLite database is ephemeral.
-- This deployment has no authentication and its Lambda Function URL/API endpoint is public. Successful agent calls consume OpenAI API usage, so it is intended only as a controlled portfolio/demo deployment; configure provider billing and usage controls before public use, and destroy it when not needed.
+- The AWS deployment is a controlled demo environment, not a hardened production service. Public application access is through CloudFront; direct unsigned Lambda Function URL access is denied, and the Lambda `/tmp` SQLite database is ephemeral.
+- This deployment has no end-user authentication. Successful CloudFront agent calls consume OpenAI API usage, so it is intended only as a controlled portfolio/demo deployment; configure provider billing and usage controls before public use, and destroy it when not needed.
 
 See [ROADMAP.md](ROADMAP.md) for the planned delivery sequence.

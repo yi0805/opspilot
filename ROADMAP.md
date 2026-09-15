@@ -144,8 +144,10 @@ Keep the UI polished but small.
 
 ### Task 008 — CloudFront-Only Lambda Origin Access
 
-**Status:** In Progress
+**Status:** Complete
 
 **Goal:** Restrict Lambda Function URL invocation to the CloudFront distribution using Lambda Function URL AWS_IAM authentication and CloudFront Origin Access Control.
+
+**Completion evidence:** The Lambda Function URL now uses `AWS_IAM`; CloudFront OAC signs Lambda-origin requests; direct unsigned Function URL requests return HTTP 403; CloudFront frontend and API smoke checks passed; one controlled evidence-backed live agent request completed successfully; and the final Terraform plan was clean.
 
 Only technologies actually implemented and verified may later be claimed on the resume.
