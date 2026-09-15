@@ -1,8 +1,36 @@
 # OpsPilot
 
-## Overview
+OpsPilot is an AI business-operations agent that turns operational questions into traceable answers and evidence-backed recommendations using synthetic business data.
 
-OpsPilot is a portfolio-quality AI business-operations agent. It turns a business question into a traceable answer: an OpenAI Responses API agent selects structured business tools, the application queries synthetic operational data, and the frontend presents an evidence-backed recommendation. The project deliberately demonstrates practical agent/tool orchestration and business workflows without hiding the control flow behind a framework.
+## Live demo
+
+<https://d10nfs9ms4ms1h.cloudfront.net>
+
+## What it does
+
+- An operator asks an operational business question.
+- An OpenAI Responses API agent selects from allowlisted structured tools.
+- The application queries deterministic synthetic business data.
+- The application records evidence from the tool results.
+- The UI returns an answer and, when the evidence supports it, a recommendation.
+
+The model requests tools; it does not access the database directly.
+
+## Visual result
+
+The initial workspace gives an operator a focused question entry point and representative prompts.
+
+![Initial OpsPilot question workspace](docs/screenshots/opspilot-workspace.png)
+
+## Engineering highlights
+
+- Direct OpenAI Responses API tool calling, with no agent-orchestration framework.
+- An explicit allowlisted tool dispatcher with strict schemas, sequential execution, and call safeguards.
+- Application-generated evidence and a guardrail that requires evidence before a recommendation is returned.
+- A FastAPI and SQLAlchemy backend over deterministic synthetic business data.
+- A React and TypeScript frontend that presents results, recommendations, and evidence.
+- Independent automated backend and frontend quality checks in GitHub Actions.
+- Terraform-managed AWS delivery: CloudFront serves a private S3 frontend and reaches an `AWS_IAM` Lambda Function URL through Origin Access Control; the OpenAI credential is an external SSM SecureString.
 
 ## Architecture
 
@@ -23,26 +51,12 @@ flowchart TD
 
 CloudFront is the public application entry point: private S3 serves the React/Vite assets by default and `/api/*` is forwarded over HTTPS to a Lambda Function URL, preserving same-origin requests. The Function URL uses `AWS_IAM`; CloudFront signs Lambda-origin requests through Origin Access Control, and its policy is scoped to the application distribution. Direct unsigned Function URL requests are denied. OpenAI chooses which allowlisted tool to request; the application validates and executes that request. The LLM never accesses the database directly. Evidence is constructed by the application from actual tool results, and a recommendation is returned only when supporting evidence exists.
 
-## Key engineering safeguards
-
-- Strict tool schemas and an explicit allowlisted dispatcher; no dynamic dispatch or `eval`.
-- Sequential tool execution, a four-call cap, and duplicate-call detection.
-- Structured final model output and a recommendation-evidence guardrail.
-- Synthetic, deterministic business data separated from agent orchestration.
-- Controlled configuration and provider errors, plus frontend validation of successful response shapes.
-
 ## Example questions
 
 1. Compare FW-100 sales and inventory. Is there a replenishment risk and what should we do?
 2. Which product appears overstocked relative to demand, and what action would you recommend?
 3. How is the Turbo Video Launch campaign performing, and should we continue spending on it?
 4. How much inventory is available for FW-100?
-
-## Screenshot
-
-The initial workspace lets an operator enter a business question or start from a representative prompt.
-
-![OpsPilot question workspace](docs/screenshots/opspilot-workspace.png)
 
 ## Local development
 
