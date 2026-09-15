@@ -18,7 +18,13 @@ The model requests tools; it does not access the database directly.
 
 ## Visual result
 
-The initial workspace gives an operator a focused question entry point and representative prompts.
+A completed OpsPilot analysis connects the recommendation directly to the operational evidence used to support it.
+
+![Completed OpsPilot analysis showing the business answer, recommended action, sales evidence, and inventory evidence](docs/screenshots/opspilot-completed-analysis.png)
+
+### Question workspace
+
+The workspace also provides representative prompts for exploring the synthetic business data.
 
 ![Initial OpsPilot question workspace](docs/screenshots/opspilot-workspace.png)
 

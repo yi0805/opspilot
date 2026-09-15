@@ -24,27 +24,28 @@ Improve recruiter-facing project presentation without changing application behav
 
 ## Screenshot assets
 
-`docs/screenshots/opspilot-workspace.png` is the only tracked screenshot. It is a real initial-workspace capture; no completed-analysis screenshot is present. The README now labels it accurately rather than implying it shows a result.
+`docs/screenshots/opspilot-completed-analysis.png` is a real completed-analysis capture of the FW-100 question and result, including the business answer, recommendation, and Sales and Inventory evidence. The README uses it as the primary completed-result visual. `docs/screenshots/opspilot-workspace.png` remains as a secondary visual for the question workspace and representative prompts.
 
 ## Files changed
 
 - `README.md`
 - `ROADMAP.md`
 - `docs/handoff/task_009_portfolio_polish.md`
+- `docs/screenshots/opspilot-completed-analysis.png`
 
 ## Validation
 
 - Reviewed the full documentation diff.
-- Confirmed the README image path resolves to the tracked screenshot and the live-demo URL is the documented CloudFront URL.
+- Confirmed the README image paths resolve to tracked screenshots and the live-demo URL is the documented CloudFront URL.
 - Inspected the preserved Mermaid diagram for valid, accurate flow syntax.
 - Confirmed no application, Terraform, workflow, dependency, AWS, or OpenAI configuration files changed.
 - No AWS command or mutation occurred, and no OpenAI or live-agent request was made.
 - No automated test suite was run because this task changes documentation only.
 
-## Optional future visual enhancement
+## Completed-analysis visual update
 
-Capture the real production UI after asking: `Compare FW-100 sales and inventory. Is there a replenishment risk and what should we do?` The image should visibly show the completed answer, recommendation, and both Sales and Inventory evidence. Do not substitute a fabricated result image.
+The completed-analysis screenshot now documents the real FW-100 result: answer, recommended action, Sales evidence, and Inventory evidence. It is presented first in the README; the initial workspace remains secondary for question-entry context.
 
 ## Recommended next task
 
-Review the pull request and its documentation-only CI status; the completed-analysis screenshot remains an optional visual enhancement, not unfinished application engineering.
+Review the documentation-only pull request and its CI status.
