@@ -150,4 +150,12 @@ Keep the UI polished but small.
 
 **Completion evidence:** The Lambda Function URL now uses `AWS_IAM`; CloudFront OAC signs Lambda-origin requests; direct unsigned Function URL requests return HTTP 403; CloudFront frontend and API smoke checks passed; one controlled evidence-backed live agent request completed successfully; and the final Terraform plan was clean.
 
+### Task 009 — Portfolio Presentation Polish
+
+**Status:** Complete
+
+**Goal:** Improve recruiter-facing project presentation without changing application behavior.
+
+**Completion evidence:** Reorganized the README for a recruiter-first introduction, surfaced the live demo, added concise engineering highlights, improved screenshot presentation, and preserved the architecture and verified technical documentation. The only optional remaining visual enhancement is a real completed-analysis screenshot.
+
 Only technologies actually implemented and verified may later be claimed on the resume.
