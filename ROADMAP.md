@@ -127,7 +127,7 @@ Keep the UI polished but small.
 
 ### Task 007 — AWS and Terraform
 
-**Status:** In Progress
+**Status:** Complete
 
 **Goal:** Deploy a verified working version using a small, cost-conscious AWS architecture.
 
@@ -139,5 +139,7 @@ Keep the UI polished but small.
 - deployment
 - production smoke testing
 - documentation
+
+**Completion evidence:** Terraform infrastructure was applied, the frontend was deployed behind CloudFront, health and frontend smoke checks passed, and one controlled evidence-backed live agent request completed successfully.
 
 Only technologies actually implemented and verified may later be claimed on the resume.

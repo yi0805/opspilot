@@ -110,15 +110,17 @@ npm run build
 
 GitHub Actions runs these independent backend and frontend quality jobs for pull requests and pushes to `main`. It uses no secrets, live OpenAI calls, or PostgreSQL service.
 
-## AWS deployment (prepared, not yet deployed)
+## AWS deployment (deployed and production-smoke-tested)
 
-Task 007 prepares a small, destroyable AWS deployment in [`infra/terraform/`](infra/terraform/). It has not been applied to AWS yet.
+Task 007 deployed a small, cost-conscious AWS environment in [`infra/terraform/`](infra/terraform/). The public application is available at <https://d10nfs9ms4ms1h.cloudfront.net>.
 
 The architecture is intentionally limited to a private S3 frontend bucket behind CloudFront, with `/api/*` routed by the same distribution to a Lambda Function URL backed by a Lambda-compatible FastAPI/Mangum container. This preserves the frontend's relative `/api/agent/query` request path and avoids a production CORS configuration. App Runner was removed because it is unavailable while this AWS account remains on its Free plan; Lambda provides request-driven execution without API Gateway.
 
 The backend image runs the AWS Lambda Python 3.12 runtime. On Lambda cold start it loads the OpenAI key from the external SSM SecureString only if no process key is already set, seeds deterministic synthetic SQLite data at `sqlite:////tmp/opspilot.db`, then adapts the FastAPI application with Mangum. The deployed database is deliberately ephemeral and read-only to the application. PostgreSQL support remains available for normal local configuration.
 
-Terraform uses normal local state only. It creates an immutable, scan-on-push ECR repository (retaining five images), a 512 MB Lambda image function with 110-second timeout and no per-function reserved concurrency, a public Function URL, a private S3 bucket with Origin Access Control, and one CloudFront distribution. Lambda uses the account's available unreserved concurrency, which avoids an unsupported reservation on the current low-quota AWS account. No VPC, RDS, load balancer, API Gateway, remote state, custom domain, or CI/CD deployment pipeline is provisioned.
+Terraform uses normal local state only. It created an immutable, scan-on-push ECR repository (retaining five images), a 512 MB, 110-second, x86_64 Lambda image function, a public Function URL, a private S3 bucket with Origin Access Control, and one CloudFront distribution. No per-function reserved concurrency is configured: Lambda uses the account's available unreserved concurrency because the account quota is 10 and AWS must retain unreserved capacity. No VPC, RDS, load balancer, API Gateway, remote state, custom domain, or CI/CD deployment pipeline is provisioned.
+
+The deployed backend artifact is image tag `992490a6220fe6b4ef3e27b4ebc68b9e8914bc93` (digest `sha256:b9fb97ec1431b31242b8a452070285c127a57856c5d6e14e7d6c8a4b2c2f889e`). The private frontend bucket contains the built React/Vite deployment, and CloudFront routes `/*` to S3 and `/api/*` to the Lambda Function URL.
 
 ### Initial deployment
 
@@ -188,7 +190,13 @@ aws s3 sync ../../frontend/dist "s3://$bucket" --delete
 aws cloudfront create-invalidation --distribution-id $distributionId --paths "/*"
 ```
 
-The public application URL is `terraform output -raw application_url`. CloudFront is the intended public application entry point and preserves the frontend's same-origin `/api/*` path. The Function URL is directly internet-accessible by design with `NONE` authorization; private ingress is intentionally not used because it would require additional VPC/PrivateLink infrastructure and cost. Later production smoke checks should verify direct Function URL health, CloudFront `/api/health`, the frontend, and one controlled live agent request through CloudFront. This repository has not yet run those AWS checks or an AWS apply.
+The public application URL is `terraform output -raw application_url`. CloudFront is the intended public application entry point and preserves the frontend's same-origin `/api/*` path. The Function URL is directly internet-accessible by design with `NONE` authorization; private ingress is intentionally not used because it would require additional VPC/PrivateLink infrastructure and cost.
+
+### Verified deployment
+
+Terraform infrastructure was applied successfully and its final infrastructure plan was clean before frontend deployment. The frontend was built and synced to the private S3 bucket (3 files, 234,991 bytes), and CloudFront invalidation `I2B19UQY6PHETREMQSMKLBL79R` completed.
+
+Production smoke checks passed: direct Lambda Function URL `GET /api/health`, CloudFront `GET /api/health`, and CloudFront `GET /` all returned HTTP 200; the OpsPilot page and its JS/CSS assets were verified. One controlled live request through `/api/agent/query` also completed successfully in about 21.3 seconds. It used `query_sales` and `query_inventory` and correctly identified FW-100 as below its reorder point, with evidence-backed advice to verify or expedite inbound stock and continue replenishment.
 
 To tear down a deployment, remove frontend objects if necessary and then destroy with the same immutable image tag:
 
@@ -207,7 +215,7 @@ The S3 bucket intentionally uses `force_destroy = false`, so frontend objects ar
 - A local OpenAI API key is needed for live agent questions.
 - There is no authentication, user account system, or persistent conversation history.
 - Responses do not stream.
-- AWS deployment code is prepared but has not been applied or production-smoke-tested yet.
+- The AWS deployment is a controlled demo environment, not a hardened production service: the Function URL/API is public and unauthenticated, and the Lambda `/tmp` SQLite database is ephemeral.
 - This deployment has no authentication and its Lambda Function URL/API endpoint is public. Successful agent calls consume OpenAI API usage, so it is intended only as a controlled portfolio/demo deployment; configure provider billing and usage controls before public use, and destroy it when not needed.
 
 See [ROADMAP.md](ROADMAP.md) for the planned delivery sequence.

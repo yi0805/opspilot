@@ -1,45 +1,73 @@
-# Task 007 — AWS and Terraform
+# Task 007 — AWS and Terraform Handoff
+
+## Status
+
+**COMPLETE**
 
 ## Goal
 
-Prepare a small AWS deployment for OpsPilot without creating cloud resources during this local migration pass.
+Deploy a small, cost-conscious, verified AWS version of OpsPilot using Terraform, with an external secret boundary and documented production smoke checks.
 
 ## Git context
 
 - **Branch:** `task/007-aws-terraform`
 - **Base commit:** `aab192f35afca004630a72aa913b01157f2b5434`
-- **PR:** [#8](https://github.com/yi0805/opspilot/pull/8) — `Task 007: add AWS Terraform deployment`.
-- **Final verified head:** The PR branch contains the implementation and subsequent review corrections; the final verified head SHA is reported in the completion report.
+- **Implementation artifact commit:** `992490a6220fe6b4ef3e27b4ebc68b9e8914bc93`
+- **PR:** [#8](https://github.com/yi0805/opspilot/pull/8) — `Task 007: add AWS Terraform deployment`
 
-## Architecture decision
+The deployed backend image intentionally remains tied to the implementation artifact commit above; a later documentation-only commit must not trigger a rebuild or redeploy.
 
-The original App Runner design was replaced because App Runner is unavailable while this AWS account remains on its Free plan. CloudFront remains the intended application entry point: its default origin is the private S3 React/Vite build and `/api/*` is routed over HTTPS to a public Lambda Function URL. Lambda runs the FastAPI application through Mangum from a private ECR image.
+## Final architecture and deployed resources
 
-The Function URL uses public `NONE` authorization by design. It remains directly internet-accessible; private ingress would require additional VPC/PrivateLink infrastructure and cost. The frontend keeps its same-origin `/api/...` requests and needs no production CORS configuration.
+Browser traffic enters CloudFront distribution `E3CZ1JJRB8PXIP` at <https://d10nfs9ms4ms1h.cloudfront.net>. The default `/*` behavior serves the React/Vite frontend from private bucket `opspilot-frontend-90fcbd693161f5fc27cac696f8`; `/api/*` forwards to the public Lambda Function URL, then the Lambda container, Mangum, FastAPI, and OpenAI Responses API.
 
-## Key changes
+- Lambda function: `opspilot-backend`, image package, x86_64, 512 MB, 110-second timeout.
+- Lambda Function URL: public, `NONE` authorization, buffered invoke mode.
+- ECR: `opspilot-backend`, immutable tags, scan on push, lifecycle retention of five images, and a known-good Lambda retrieval policy.
+- SSM: `/opspilot/prod/openai-api-key` is an externally managed SecureString and is outside Terraform state.
+- Frontend bucket: private, BucketOwnerEnforced, public access blocked, AES256 encryption, and CloudFront-only read policy.
+- No per-function reserved concurrency is configured. The account concurrency quota is 10, all currently unreserved; AWS requires unreserved capacity to remain available.
 
-- Replaced App Runner resources, IAM roles, outputs, and CloudFront origin with a Lambda container-image function, Function URL, two public Function URL permissions, execution role, ECR retrieval policy, and seven-day CloudWatch log group.
-- Added a Python 3.12 Lambda image, Mangum handler, and a cold-start-only SSM SecureString loader. The loader reads `/opspilot/prod/openai-api-key` only when `OPENAI_API_KEY` is absent, then seeds deterministic SQLite before importing FastAPI.
-- Preserved immutable, scan-on-push, force-deletable ECR; private S3/OAC; no API caching; and CloudFront's 120-second API origin timeout.
-- Restricted Lambda to 512 MB, a 110-second timeout, and x86_64 image execution. The deployment does not configure per-function reserved concurrency, so Lambda uses the account's available unreserved concurrency; this avoids an unsupported reservation on the current low-quota AWS account and does not cap cumulative OpenAI spending.
+## Deployed artifact and frontend
 
-## Local verification
+- Backend image tag: `992490a6220fe6b4ef3e27b4ebc68b9e8914bc93`
+- Backend image digest: `sha256:b9fb97ec1431b31242b8a452070285c127a57856c5d6e14e7d6c8a4b2c2f889e`
+- Frontend deployment: 3 files, 234,991 bytes.
+- CloudFront invalidation: `I2B19UQY6PHETREMQSMKLBL79R`, completed.
 
-- Terraform format, initialization with local state, and validation passed. A read-only plan through the `opspilot` profile returned `20 to add, 0 to change, 0 to destroy` and contained only the intended architecture.
-- The Lambda image was built and invoked locally through the Lambda Runtime Interface Emulator using a dummy key; `GET /api/health` returned `statusCode: 200` with `{"status":"ok"}` without contacting SSM or OpenAI.
-- Backend quality checks passed: Ruff, mypy, compileall, and 36 pytest tests. Frontend `npm ci`, tests (18), lint, typecheck, and production build passed.
-- The read-only AWS identity, Lambda list, and ECR list checks succeeded through the `opspilot` profile; no AWS resource was created, updated, or deleted in this pass.
+Lambda container builds must use a Lambda-compatible single-platform image rather than an OCI image index with provenance artifacts:
 
-## Deployment status and limitations
+```powershell
+docker buildx build `
+  --platform linux/amd64 `
+  --provenance=false `
+  --sbom=false `
+  --load `
+  --tag "opspilot-backend:$imageTag" `
+  ../../backend
+```
 
-- **Implemented locally:** Lambda deployment code, image packaging, runtime secret boundary, tests, documentation, and local-state configuration.
-- **NOT YET deployed:** no Terraform apply, ECR push, SSM write, S3 sync, CloudFront invalidation, or other AWS mutation has occurred.
-- The OpenAI key remains outside Terraform state in an externally managed SecureString.
-- The Lambda Function URL/API has no authentication. Successful public agent requests consume OpenAI API usage. This deployment does not configure per-function reserved concurrency, so Lambda uses the account's available unreserved concurrency; this avoids an unsupported reservation on the current low-quota AWS account and does not cap cumulative OpenAI spending. Provider billing and usage controls still matter.
-- The deployment is intended as a controlled portfolio/demo environment designed to stay within available Free-plan services/allowances for small demo usage, not as a guarantee of zero cost. Destroy it when it is not needed.
-- S3 frontend objects must be manually removed before destroy because `force_destroy = false`. Terraform destroys the Lambda, Function URL, permissions, CloudFront, ECR, and other managed infrastructure; ECR uses `force_delete = true`. The external SSM parameter remains unless deliberately deleted manually.
+App Runner was abandoned because it was unavailable on the target AWS Free-plan account.
 
-## Recommended next verification step
+## Verification
 
-After review, authenticate the named profile with `aws login --profile opspilot --region ap-southeast-2` if needed, then set `$env:AWS_PROFILE = "opspilot"`, `$env:AWS_REGION = "ap-southeast-2"`, and `$region = $env:AWS_REGION` so AWS CLI and Terraform use the same temporary credential context. Temporary credentials can expire and require `aws login` again. Initialize and plan, create/update the external SSM SecureString, bootstrap only ECR and its Lambda retrieval policy, push the immutable current Git-SHA Lambda image, then run a normal plan/apply. Build and sync the frontend, invalidate CloudFront, verify direct Function URL and CloudFront health, verify the frontend, make one controlled live agent request through CloudFront, and document that verified deployment. Task 007 remains **In Progress** until those checks succeed.
+Terraform applied successfully. The authorized tainted Lambda replacement recovery ended with `6 added, 0 changed, 1 destroyed`; the only destroy was that expected replacement. The final infrastructure plan before frontend deployment was clean. A later plan was not rerun during smoke testing because Terraform CLI was unavailable in that environment; frontend S3 uploads and CloudFront invalidations are intentionally outside Terraform.
+
+- Direct Lambda Function URL `GET /api/health`: HTTP 200, `{"status":"ok"}`.
+- CloudFront `GET /api/health`: HTTP 200, `{"status":"ok"}`.
+- CloudFront frontend `GET /`: HTTP 200, HTML, OpsPilot page, and JS/CSS assets verified.
+- Exactly one controlled external `POST /api/agent/query` completed with HTTP 200 and status `completed` in about 21.3 seconds.
+- That request compared FW-100 sales and inventory using `query_sales` and `query_inventory`: recent sales 310, on hand 28, reserved 6, available 22, inbound 120, reorder point 30. It correctly identified replenishment risk and recommended verifying or expediting inbound delivery while continuing replenishment.
+- CloudWatch showed no initialization, SSM configuration, request, timeout, or unhandled-exception errors; no secrets were exposed.
+
+## Limitations and operational notes
+
+- The Function URL/API is directly internet-accessible and unauthenticated by design.
+- Successful agent requests consume OpenAI usage; Lambda, ECR, S3, and CloudFront can also incur charges. This is not a guaranteed zero-cost deployment.
+- No persistent production database exists; seeded SQLite under Lambda `/tmp` is ephemeral.
+- No custom domain, VPC/private ingress, API Gateway, or CI/CD deployment pipeline is provisioned.
+- The S3 bucket uses `force_destroy = false`, so frontend objects must be removed before Terraform destroy. The external SSM SecureString remains unless manually removed.
+
+## Recommended next task
+
+Proceed to the next roadmap task only when separately authorized. Do not rebuild or redeploy Task 007 merely for documentation changes.
