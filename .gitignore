@@ -29,3 +29,10 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# Terraform local state and variable inputs
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
