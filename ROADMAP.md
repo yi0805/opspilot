@@ -144,7 +144,7 @@ Keep the UI polished but small.
 
 ### Task 008 — CloudFront-Only Lambda Origin Access
 
-**Status:** Complete
+**Status:** In Progress
 
 **Goal:** Restrict Lambda Function URL invocation to the CloudFront distribution using Lambda Function URL AWS_IAM authentication and CloudFront Origin Access Control.
 

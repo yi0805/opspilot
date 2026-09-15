@@ -2,7 +2,7 @@
 
 ## Status
 
-**COMPLETE — READY FOR CHATGPT REVIEW**
+**IMPLEMENTATION COMPLETE — DEPLOYMENT PENDING**
 
 ## Goal
 
@@ -12,8 +12,8 @@ Remove direct unauthenticated access to the Lambda Function URL while preserving
 
 - **Branch:** `task/008-cloudfront-lambda-oac`
 - **Base commit:** `356c5bfa5e7d2ab60f45b12bfded1ce2da3c6687`
-- **Final implementation commit:** recorded by the Task 008 branch and pull request after this handoff is committed.
-- **Pull request:** pending creation; this task does not merge it.
+- **Initial implementation commit reviewed by ChatGPT:** `80923b1658a12a811fe07d9885d163a83aa8263d`
+- **Pull request:** [#9 — Task 008: restrict Lambda origin to CloudFront](https://github.com/yi0805/opspilot/pull/9)
 
 ## Security problem addressed
 
@@ -26,6 +26,10 @@ Task 007 exposed the Lambda Function URL with `NONE` authentication and wildcard
 - The Lambda origin uses that dedicated OAC.
 - The two wildcard Lambda permissions are replaced by `cloudfront.amazonaws.com` permissions scoped with the CloudFront distribution ARN: one for `lambda:InvokeFunctionUrl` with `AWS_IAM`, and one for `lambda:InvokeFunction` constrained to invocation through the Function URL.
 - Lambda permissions depend on the CloudFront distribution ARN, while the distribution depends only on the Lambda URL and OAC. This one-way relationship avoids a Terraform dependency cycle.
+
+## Deployment sequencing
+
+AWS recommends granting CloudFront permission to access the Lambda Function URL before enabling the Lambda OAC on the CloudFront distribution. The Terraform resources deliberately retain the one-way deployment relationship from the CloudFront distribution to the Lambda permission resources: the permissions reference the distribution ARN, while the distribution has no dependency on those permission resources. This avoids a Terraform graph cycle, but does not enforce AWS's recommended operational ordering. A later production deployment must therefore use a reviewed, controlled deployment sequence. No deployment sequencing is executed in this task.
 
 ## POST payload hash requirement
 
@@ -57,9 +61,13 @@ No read-only plan was run because the workstation initially had no Terraform exe
 
 No AWS deployment, Terraform apply/destroy, state mutation, service invocation, Docker activity, or frontend deployment was performed for this task. After a reviewed deployment, verify:
 
-- CloudFront `GET /api/health` succeeds.
-- CloudFront `POST /api/agent/query` succeeds.
-- A direct unsigned Lambda Function URL request returns HTTP 403.
+- CloudFront `GET /api/health` returns HTTP 200.
+- CloudFront frontend `GET /` returns HTTP 200.
+- Exactly one controlled CloudFront `POST /api/agent/query` returns HTTP 200 with status `completed`.
+- Direct unsigned Lambda Function URL `GET /api/health` returns HTTP 403.
+- The direct unsigned Lambda Function URL `/api/agent/query` endpoint is not publicly usable.
+- The final Terraform plan is clean.
+- The final CI run is green.
 
 ## Known limitations
 
