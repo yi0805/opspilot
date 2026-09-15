@@ -22,8 +22,6 @@ The initial workspace gives an operator a focused question entry point and repre
 
 ![Initial OpsPilot question workspace](docs/screenshots/opspilot-workspace.png)
 
-This repository does not yet include a screenshot of a completed analysis with its answer, recommendation, and evidence.
-
 ## Engineering highlights
 
 - Direct OpenAI Responses API tool calling, with no agent-orchestration framework.

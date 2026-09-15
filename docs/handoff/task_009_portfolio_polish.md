@@ -13,7 +13,7 @@ Improve recruiter-facing project presentation without changing application behav
 - **Branch:** `task/009-portfolio-polish`
 - **Base commit:** `dc50612c526e2a31c09a59f670ee942e4275c537`
 - **Final commit:** the documentation commit that contains this handoff
-- **Pull request:** to be opened after the documentation commit is pushed
+- **Pull request:** [#10 — Task 009: polish portfolio presentation](https://github.com/yi0805/opspilot/pull/10)
 
 ## Scope and README outcome
 
