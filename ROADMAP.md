@@ -156,6 +156,6 @@ Keep the UI polished but small.
 
 **Goal:** Improve recruiter-facing project presentation without changing application behavior.
 
-**Completion evidence:** Reorganized the README for a recruiter-first introduction, surfaced the live demo, added concise engineering highlights, improved screenshot presentation, and preserved the architecture and verified technical documentation. The only optional remaining visual enhancement is a real completed-analysis screenshot.
+**Completion evidence:** Reorganized the README for a recruiter-first introduction, surfaced the live demo, added concise engineering highlights, improved screenshot presentation with a completed-analysis result, and preserved the architecture and verified technical documentation.
 
 Only technologies actually implemented and verified may later be claimed on the resume.
