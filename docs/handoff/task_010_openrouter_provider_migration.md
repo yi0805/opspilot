@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete as a repository change; not deployed.
+Complete as a repository change. Subsequent Task 021 production verification confirmed the migration is deployed.
 
 ## Goal
 
@@ -18,7 +18,7 @@ Migrate the existing Responses API agent integration from direct OpenAI API acce
 ## Key changes
 
 - Renamed backend settings, environment variables, Lambda startup secret loading, and controlled configuration errors to OpenRouter terminology.
-- Kept the official `openai` Python SDK and Responses API workflow, constructing its client with the OpenRouter endpoint and passing `provider.require_parameters=true` through `extra_body` on reasoning and final requests.
+- Kept the official `openai` Python SDK and Responses API workflow, constructing its client with the OpenRouter endpoint. The original `provider.require_parameters=true` routing constraint was later removed by Task 018 after production verification identified it as incompatible.
 - Set the default model to `openai/gpt-5.6-luna`.
 - Updated Terraform to read only `/opspilot/prod/openrouter-api-key` with `ssm:GetParameter`, and to configure the renamed Lambda environment variables.
 - Updated provider-boundary and runtime-secret tests, plus the frontend error-message regression assertion. No frontend application behavior or API contract changed.
@@ -36,7 +36,7 @@ Migrate the existing Responses API agent integration from direct OpenAI API acce
 
 ## Known limitations and decisions
 
-- No AWS resources, SSM values, or deployment were changed. The live deployment continues to use its existing provider until a separate controlled deployment task.
+- This task itself did not change AWS resources, SSM values, or deployment. Subsequent controlled deployment and Task 021 verification confirmed the production provider/router is OpenRouter.
 - No provider abstraction, fallback key, optional OpenRouter attribution headers, or upstream-provider pin was added.
 
 ## Recommended next task
