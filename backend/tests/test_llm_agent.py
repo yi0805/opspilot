@@ -1,5 +1,6 @@
 import copy
 import json
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -25,7 +26,10 @@ class FakeResponses:
 
     def create(self, **kwargs: object) -> object:
         self.calls.append(copy.deepcopy(kwargs))
-        return self._responses.pop(0)
+        response = self._responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 class FakeClient:
@@ -62,6 +66,68 @@ def structured_final(
             }
         )
     )
+
+
+class ProviderFailure(RuntimeError):
+    def __init__(
+        self, message: str, *, status_code: int | None = None, request_id: str | None = None
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.request_id = request_id
+        self.body = {"message": message}
+        self.headers = {"authorization": "Bearer sk-secret-value"}
+
+
+def test_agent_logs_sanitized_reasoning_provider_failure(
+    caplog: pytest.LogCaptureFixture, session: Session
+) -> None:
+    failure = ProviderFailure(
+        "Bearer sk-secret-value user_prompt=CONFIDENTIAL",
+        status_code=401,
+        request_id="req_reasoning_123",
+    )
+    client = FakeClient([failure])
+
+    with caplog.at_level(logging.WARNING, logger="app.services.llm_agent"):
+        with pytest.raises(LLMProviderError, match="OpenRouter could not process the business question"):
+            answer_business_question(session, "Do not log this question", client=client)
+
+    assert caplog.messages == [
+        "OpenRouter request failed stage=reasoning exception_type=ProviderFailure "
+        "status_code=401 request_id=req_reasoning_123"
+    ]
+    assert "sk-secret-value" not in caplog.text
+    assert "CONFIDENTIAL" not in caplog.text
+    assert str(failure) not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "request_id",
+    [None, "Bearer sk-secret-value user_prompt=CONFIDENTIAL"],
+    ids=["missing", "unsafe"],
+)
+def test_agent_logs_sanitized_final_provider_failure_without_safe_request_id(
+    request_id: str | None, caplog: pytest.LogCaptureFixture, session: Session
+) -> None:
+    failure = ProviderFailure(
+        "Bearer sk-secret-value user_prompt=CONFIDENTIAL", request_id=request_id
+    )
+    client = FakeClient([no_tool_response(), failure])
+
+    with caplog.at_level(logging.WARNING, logger="app.services.llm_agent"):
+        with pytest.raises(LLMProviderError, match="OpenRouter could not produce a final business answer"):
+            answer_business_question(session, "Do not log this question", client=client)
+
+    assert caplog.messages == [
+        "OpenRouter request failed stage=final exception_type=ProviderFailure "
+        "status_code=None request_id=None"
+    ]
+    assert "sk-secret-value" not in caplog.text
+    assert "CONFIDENTIAL" not in caplog.text
+    if request_id is not None:
+        assert request_id not in caplog.text
+    assert str(failure) not in caplog.text
 
 
 def test_agent_executes_two_real_tools_and_preserves_accumulated_context(session: Session) -> None:

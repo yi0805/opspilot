@@ -167,3 +167,11 @@ Only technologies actually implemented and verified may later be claimed on the 
 **Goal:** Migrate the repository's AI-provider configuration from direct OpenAI API access to OpenRouter while preserving the Responses API tool-calling workflow and application behavior.
 
 **Completion evidence:** Runtime configuration, Lambda secret loading, Terraform secret access, and automated tests now use the OpenRouter key, model, endpoint, and provider routing requirement. This repository change has not been deployed to production.
+
+### Task 014 — Safe OpenRouter Provider Error Observability
+
+**Status:** Complete
+
+**Goal:** Add minimal server-side diagnostics for OpenRouter SDK failures without exposing provider details to API clients or sensitive request data to logs.
+
+**Completion evidence:** Reasoning and final provider request failures now emit only their stage, exception class name, allowlisted HTTP status code, and allowlisted request ID. The existing generic HTTP 502 response remains unchanged, and focused tests assert sensitive exception content is excluded from logs.
