@@ -1,6 +1,7 @@
 """Controlled multi-tool Responses API business-question service."""
 
 import json
+import logging
 from typing import Any, Literal
 
 from openai import OpenAI
@@ -14,6 +15,8 @@ from app.services.llm_tools import (
     dispatch_tool,
     validate_tool_arguments,
 )
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_INSTRUCTIONS = (
     "Answer concise, commercially understandable business questions using the supplied "
@@ -75,6 +78,30 @@ class LLMProviderError(RuntimeError):
     """Raised when a provider response cannot be used safely."""
 
 
+def _log_provider_failure(stage: Literal["reasoning", "final"], error: Exception) -> None:
+    """Log only allowlisted scalar metadata from a provider request failure."""
+    status_code = getattr(error, "status_code", None)
+    if type(status_code) is not int or not 100 <= status_code <= 599:
+        status_code = None
+
+    request_id = getattr(error, "request_id", None)
+    if (
+        type(request_id) is not str
+        or not request_id
+        or not request_id.isascii()
+        or not request_id.isprintable()
+    ):
+        request_id = None
+
+    logger.warning(
+        "OpenRouter request failed stage=%s exception_type=%s status_code=%s request_id=%s",
+        stage,
+        type(error).__name__,
+        status_code,
+        request_id,
+    )
+
+
 def _item_value(item: Any, field_name: str) -> Any:
     if isinstance(item, dict):
         return item.get(field_name)
@@ -129,6 +156,7 @@ def _create_reasoning_response(
             extra_body={"provider": {"require_parameters": True}},
         )
     except Exception as error:
+        _log_provider_failure("reasoning", error)
         raise LLMProviderError("OpenRouter could not process the business question.") from error
 
 
@@ -145,6 +173,7 @@ def _create_final_response(client: OpenAI | Any, settings: Settings, input_messa
             extra_body={"provider": {"require_parameters": True}},
         )
     except Exception as error:
+        _log_provider_failure("final", error)
         raise LLMProviderError("OpenRouter could not produce a final business answer.") from error
 
 
