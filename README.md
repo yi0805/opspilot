@@ -1,5 +1,7 @@
 # OpsPilot
 
+[![CI](https://github.com/yi0805/opspilot/actions/workflows/ci.yml/badge.svg)](https://github.com/yi0805/opspilot/actions/workflows/ci.yml)
+
 OpsPilot is an end-to-end AI business-operations agent that turns operational questions into traceable answers and evidence-backed recommendations using synthetic business data.
 
 ## Live demo
