@@ -13,7 +13,7 @@ Review OpsPilot as a technical recruiter or junior software, cloud, or AI engine
 - **Branch:** `task/023-portfolio-recruiter-review`
 - **Base commit:** `efd75a146d2f801746922c9304ea920bfd088ffb`
 - **Final commit:** this handoff's containing commit
-- **Pull request:** pending creation, if GitHub authentication permits
+- **Pull request:** #17
 
 ## Recruiter-facing findings
 
@@ -60,10 +60,18 @@ The detailed architecture, deployment, and local-development sections were inten
 
 ## Confirmed unchanged
 
-- Runtime and backend behavior
-- Frontend behavior
-- Terraform and AWS resources
-- Secrets, container images, ECR lifecycle policy, deployment state, and provider configuration
+Task 023 itself did not modify:
+
+- runtime or backend behavior
+- frontend behavior
+- Terraform
+- AWS resources
+- secrets
+- deployment configuration
+- provider configuration
+- ECR lifecycle policy
+
+No AWS mutation was performed as part of Task 023.
 
 ## Relevant decisions and recommendations outside the repository
 
