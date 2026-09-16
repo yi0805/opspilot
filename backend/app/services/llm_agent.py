@@ -153,7 +153,6 @@ def _create_reasoning_response(
             input=input_messages,
             tools=list(TOOL_DEFINITIONS),  # type: ignore[arg-type]
             parallel_tool_calls=False,
-            extra_body={"provider": {"require_parameters": True}},
         )
     except Exception as error:
         _log_provider_failure("reasoning", error)
@@ -170,7 +169,6 @@ def _create_final_response(client: OpenAI | Any, settings: Settings, input_messa
             parallel_tool_calls=False,
             tool_choice="none",
             text={"format": FINAL_OUTPUT_SCHEMA},
-            extra_body={"provider": {"require_parameters": True}},
         )
     except Exception as error:
         _log_provider_failure("final", error)

@@ -196,7 +196,9 @@ def test_agent_executes_two_real_tools_and_preserves_accumulated_context(session
         assert request["instructions"] == SYSTEM_INSTRUCTIONS
         assert request["tools"] == list(TOOL_DEFINITIONS)
         assert request["parallel_tool_calls"] is False
-        assert request["extra_body"] == {"provider": {"require_parameters": True}}
+        assert "extra_body" not in request
+        assert "provider" not in request
+        assert "require_parameters" not in request
         assert request["input"][0] == {"role": "user", "content": question}
 
     second_input = client.responses.calls[1]["input"]
