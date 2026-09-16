@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete as a repository-only change; not deployed.
+Complete as a repository-only change. Subsequent Task 020 production verification confirmed the OpenRouter migration completed without a provider-failure warning; Task 021 records that verified state.
 
 ## Goal
 

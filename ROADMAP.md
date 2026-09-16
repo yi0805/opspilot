@@ -166,7 +166,7 @@ Only technologies actually implemented and verified may later be claimed on the 
 
 **Goal:** Migrate the repository's AI-provider configuration from direct OpenAI API access to OpenRouter while preserving the Responses API tool-calling workflow and application behavior.
 
-**Completion evidence:** Runtime configuration, Lambda secret loading, Terraform secret access, and automated tests now use the OpenRouter key, model, endpoint, and provider routing requirement. This repository change has not been deployed to production.
+**Completion evidence:** Runtime configuration, Lambda secret loading, Terraform secret access, and automated tests use the OpenRouter key, model, and endpoint. Task 020 production verification confirmed OpenRouter is live with model `openai/gpt-5.6-luna`; Task 021 records that verified state.
 
 ### Task 014 — Safe OpenRouter Provider Error Observability
 
@@ -182,4 +182,12 @@ Only technologies actually implemented and verified may later be claimed on the 
 
 **Goal:** Remove the incompatible OpenRouter `provider.require_parameters` routing constraint from Responses API requests while preserving the agent workflow and output guardrails.
 
-**Completion evidence:** Both reasoning and final Responses API requests now omit the provider-routing constraint. Local fake-client tests confirm the requests retain their model, instructions, tools, sequential execution setting, and final structured-output settings; all backend checks pass. This repository-only change has not been deployed.
+**Completion evidence:** Both reasoning and final Responses API requests omit `provider.require_parameters`. Local fake-client tests confirm the requests retain their model, instructions, tools, sequential execution setting, and final structured-output settings; all backend checks pass. Task 020 production verification confirmed the removal fixed the previous OpenRouter 404 routing failure; Task 021 records that verified result.
+
+### Task 021 — OpenRouter Production Verification Closeout
+
+**Status:** Complete
+
+**Goal:** Record the production-verified OpenRouter architecture and migration status without changing runtime, infrastructure, or deployment state.
+
+**Completion evidence:** The deployed Lambda image `f1b397c1d32208df885fd7a36dbf73c504c1f390` completed a CloudFront agent request with HTTP 200 and status `completed`, including `query_sales` and `query_inventory` evidence from `synthetic_business_data`, with no provider-failure warning. CloudFront and `/api/health` were healthy, unsigned Function URL access returned HTTP 403, the `AWS_IAM`/buffered Function URL and SigV4-signing OAC remained intact, and the final Terraform plan reported no changes.
