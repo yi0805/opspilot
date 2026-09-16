@@ -1,10 +1,23 @@
 # OpsPilot
 
-OpsPilot is an AI business-operations agent that turns operational questions into traceable answers and evidence-backed recommendations using synthetic business data.
+OpsPilot is an end-to-end AI business-operations agent that turns operational questions into traceable answers and evidence-backed recommendations using synthetic business data.
 
 ## Live demo
 
-<https://d10nfs9ms4ms1h.cloudfront.net>
+[Open the deployed demo](https://d10nfs9ms4ms1h.cloudfront.net)
+
+## At a glance
+
+| Area | Implementation |
+| --- | --- |
+| What I built | An end-to-end operations-analysis demo that connects business questions to answers, recommendations, and their underlying evidence. |
+| Frontend | React, TypeScript, and Vite, served from private S3 through CloudFront. |
+| Backend | Python, FastAPI, Mangum, SQLAlchemy, and deterministic synthetic business data. |
+| AI controls | OpenRouter-routed Responses API calls through the official OpenAI Python SDK; explicit allowlisted tools, sequential execution, local validation, and a four-call limit. |
+| Trust | Evidence is constructed and owned by the application; a recommendation is returned only when successful tool results provide supporting evidence. The model has no direct database access. |
+| AWS and delivery | Terraform-managed CloudFront, private S3, ECR, Lambda container image, SSM Parameter Store, and least-privilege IAM. CloudFront signs Lambda-origin requests with SigV4; unsigned direct Function URL requests are denied. |
+| Quality | GitHub Actions runs independent backend and frontend tests, linting, type checks, and build/compile checks. |
+| Demo data | All business data is synthetic. |
 
 ## What it does
 
