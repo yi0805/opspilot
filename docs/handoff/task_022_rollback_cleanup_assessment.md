@@ -13,7 +13,7 @@ Assess the rollback material retained after the OpenRouter migration and recomme
 - **Branch:** `task/022-rollback-cleanup-assessment`
 - **Base commit:** `eecbd5d88665f16e01e8fe177eba1bb0c2a0c24a`
 - **Final commit:** this handoff's containing commit
-- **Pull request:** not created — GitHub CLI authentication is unavailable in this environment (`gh auth login` or `GH_TOKEN` is required)
+- **Pull request:** #16
 
 ## Read-only AWS inspection
 
@@ -67,12 +67,14 @@ The `2005cd8…` and `992490a…` tags resolve to the same pre-migration direct-
 
 ## Retention and recovery recommendation
 
-Use a simple 30-day retention window starting from the 2026-09-16 successful OpenRouter production verification:
+Use a simple 30-day intended rollback-retention window starting from the 2026-09-16 successful OpenRouter production verification:
 
 1. Retain the current OpenRouter secret and image at all times.
 2. During the window, retain exactly one previous known-good direct-OpenAI image (`sha256:b9fb…`, with either existing tag) and `/opspilot/prod/openai-api-key`. Multiple OpenAI-era images do not add meaningful recovery value.
 3. The old OpenAI secret has only limited rollback value: it is useful solely with that retained image and an approved infrastructure/configuration rollback. An old image alone cannot work because current Lambda configuration names and the execution-role permission target the OpenRouter parameter only.
 4. If OpenRouter unexpectedly fails, recover through a separately reviewed rollback that restores the historical OpenAI Terraform/runtime configuration, changes the Lambda image tag to the retained direct-OpenAI image, restores `OPENAI_MODEL` and `OPENAI_SSM_PARAMETER_NAME`, restores role access to the legacy parameter, applies the infrastructure change, and then performs the appropriate controlled verification. Retaining the current Git history or a reviewed rollback commit is therefore also necessary.
+
+The 30-day period is a retention target, not a guarantee that the direct-OpenAI image will remain physically available for all 30 days. The current ECR lifecycle configuration is count-based (`tagStatus="any"`, `countType="imageCountMoreThan"`, `countNumber=5`), so additional backend image pushes during that period may make the retained rollback image eligible for expiration. Before any additional backend image push during the intended retention window, re-evaluate the rollback-image retention decision. If guaranteed 30-day image retention is required, changing or protecting the ECR lifecycle behavior must be performed in a separate reviewed and authorized task; Task 022 does not change that policy.
 
 At the end of the window, if no rollback is needed, a separate authorized cleanup task should delete the following exact scope after re-listing metadata immediately before mutation:
 
@@ -81,7 +83,7 @@ At the end of the window, if no rollback is needed, a separate authorized cleanu
 - obsolete migration-era image digests `sha256:e730ad5ab49cabb0392c8200d2d108ceaa381f358927fd72d245ccaff51af95e` (`af79175…`) and `sha256:ccf0be3c1868763bbd4b5bb6d6071be57f5f7e9b1811846348fe67bec1718702` (`c17ba45…`); and
 - the obsolete OCI-index group `sha256:ae4b4f1c60364db46584a8145d1e04140e09dcad7399d86dcf42fb9c60424ca6` (`3a94f43…`) with linked untagged manifests `sha256:381f63220df27a9cd315267459f3ede4c6926ba7ae04d47d180c39fdafe22942` and `sha256:bc848db3a5131cbf812d447762dcc82fd3c286381db49cdf0f8bf4a74dcd7f4f`.
 
-That future task must retain `/opspilot/prod/openrouter-api-key` and `sha256:0da58199ff2ca350fae9ec3a2a56598ce0db7f0cb7fa3e3c6d9e5cab2749886a` (`f1b397…`). It must also re-check the Lambda resolved image, SSM/IAM references, ECR image-index linkage, lifecycle-policy effects, and retention-window decision before deleting anything.
+That future task must retain `/opspilot/prod/openrouter-api-key` and `sha256:0da58199ff2ca350fae9ec3a2a56598ce0db7f0cb7fa3e3c6d9e5cab2749886a` (`f1b397…`). Immediately before deleting anything, it must re-validate ECR inventory and lifecycle effects, as well as the Lambda resolved image, SSM/IAM references, ECR image-index linkage, and retention-window decision.
 
 ## Verification
 
