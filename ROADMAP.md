@@ -191,3 +191,11 @@ Only technologies actually implemented and verified may later be claimed on the 
 **Goal:** Record the production-verified OpenRouter architecture and migration status without changing runtime, infrastructure, or deployment state.
 
 **Completion evidence:** The deployed Lambda image `f1b397c1d32208df885fd7a36dbf73c504c1f390` completed a CloudFront agent request with HTTP 200 and status `completed`, including `query_sales` and `query_inventory` evidence from `synthetic_business_data`, with no provider-failure warning. CloudFront and `/api/health` were healthy, unsigned Function URL access returned HTTP 403, the `AWS_IAM`/buffered Function URL and SigV4-signing OAC remained intact, and the final Terraform plan reported no changes.
+
+### Task 022 — Rollback Material Cleanup Assessment
+
+**Status:** Complete
+
+**Goal:** Perform a read-only assessment of OpenRouter-migration rollback material and document an evidence-based cleanup recommendation without changing AWS resources, secrets, images, Terraform, or runtime code.
+
+**Completion evidence:** Lambda `opspilot-backend` is active on the OpenRouter image tag `f1b397c1d32208df885fd7a36dbf73c504c1f390` (resolved digest `sha256:0da58199ff2ca350fae9ec3a2a56598ce0db7f0cb7fa3e3c6d9e5cab2749886a`). Its environment and execution-role SSM permission reference only `/opspilot/prod/openrouter-api-key`. Metadata-only SSM and ECR inspection identified one temporary direct-OpenAI rollback pair, obsolete migration-era images, and an old linked OCI-index image group. No secret values were retrieved and no AWS resources were changed; the detailed retention recommendation and separately authorized future cleanup scope are recorded in the Task 022 handoff.
