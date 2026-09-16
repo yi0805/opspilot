@@ -3,10 +3,10 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 locals {
-  name                      = var.project_name
-  lambda_function_name      = "${var.project_name}-backend"
-  openai_ssm_parameter_name = "/opspilot/prod/openai-api-key"
-  openai_ssm_parameter_arn  = "arn:${data.aws_partition.current.partition}:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter${local.openai_ssm_parameter_name}"
+  name                          = var.project_name
+  lambda_function_name          = "${var.project_name}-backend"
+  openrouter_ssm_parameter_name = "/opspilot/prod/openrouter-api-key"
+  openrouter_ssm_parameter_arn  = "arn:${data.aws_partition.current.partition}:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter${local.openrouter_ssm_parameter_name}"
   common_tags = {
     Project     = "OpsPilot"
     Environment = "production"
@@ -96,9 +96,9 @@ data "aws_iam_policy_document" "lambda_execution" {
   }
 
   statement {
-    sid       = "ReadOpenAiParameter"
+    sid       = "ReadOpenRouterParameter"
     actions   = ["ssm:GetParameter"]
-    resources = [local.openai_ssm_parameter_arn]
+    resources = [local.openrouter_ssm_parameter_arn]
   }
 }
 
@@ -119,10 +119,10 @@ resource "aws_lambda_function" "backend" {
 
   environment {
     variables = {
-      APP_ENV                   = "production"
-      DATABASE_URL              = "sqlite:////tmp/opspilot.db"
-      OPENAI_MODEL              = "gpt-5.6-luna"
-      OPENAI_SSM_PARAMETER_NAME = local.openai_ssm_parameter_name
+      APP_ENV                       = "production"
+      DATABASE_URL                  = "sqlite:////tmp/opspilot.db"
+      OPENROUTER_MODEL              = "openai/gpt-5.6-luna"
+      OPENROUTER_SSM_PARAMETER_NAME = local.openrouter_ssm_parameter_name
     }
   }
 
