@@ -18,7 +18,7 @@ Add minimal, security-safe server-side logging for OpenRouter SDK request failur
 ## Key changes
 
 - Added standard-library warning logging at the reasoning and final Responses API request boundaries.
-- Logs contain only `stage`, exception class name, an integer HTTP `status_code` in the 100–599 range when available, and a non-empty printable ASCII `request_id` when available. Missing or invalid metadata is recorded as `None`.
+- Logs contain only `stage`, exception class name, an integer HTTP `status_code` in the 100–599 range when available, and a `request_id` matching `[A-Za-z0-9._:-]{1,128}` when available. Missing or invalid metadata is recorded as `None`.
 - Kept exception messages, bodies, response objects, headers, prompts, tool data, request payloads, secrets, and stack traces out of the log call.
 - Added focused fake-client tests for both request stages, safe metadata, absent metadata, sensitive exception content, and unchanged `LLMProviderError` behavior.
 
@@ -26,7 +26,7 @@ Add minimal, security-safe server-side logging for OpenRouter SDK request failur
 
 - `python -m ruff check app tests` — passed.
 - `python -m mypy app` — passed: 23 source files, no issues.
-- `python -m pytest` — passed: 39 tests. One pre-existing pytest-asyncio configuration deprecation warning and one Starlette/TestClient deprecation warning were reported.
+- `python -m pytest` — passed: 40 tests. One pre-existing pytest-asyncio configuration deprecation warning and one Starlette/TestClient deprecation warning were reported.
 - `python -m compileall -q app tests` — passed.
 - `git diff --check` — passed.
 

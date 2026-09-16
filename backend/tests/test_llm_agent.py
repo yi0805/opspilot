@@ -102,10 +102,17 @@ def test_agent_logs_sanitized_reasoning_provider_failure(
     assert str(failure) not in caplog.text
 
 
-def test_agent_logs_sanitized_final_provider_failure_without_metadata(
-    caplog: pytest.LogCaptureFixture, session: Session
+@pytest.mark.parametrize(
+    "request_id",
+    [None, "Bearer sk-secret-value user_prompt=CONFIDENTIAL"],
+    ids=["missing", "unsafe"],
+)
+def test_agent_logs_sanitized_final_provider_failure_without_safe_request_id(
+    request_id: str | None, caplog: pytest.LogCaptureFixture, session: Session
 ) -> None:
-    failure = ProviderFailure("Bearer sk-secret-value user_prompt=CONFIDENTIAL")
+    failure = ProviderFailure(
+        "Bearer sk-secret-value user_prompt=CONFIDENTIAL", request_id=request_id
+    )
     client = FakeClient([no_tool_response(), failure])
 
     with caplog.at_level(logging.WARNING, logger="app.services.llm_agent"):
@@ -118,6 +125,8 @@ def test_agent_logs_sanitized_final_provider_failure_without_metadata(
     ]
     assert "sk-secret-value" not in caplog.text
     assert "CONFIDENTIAL" not in caplog.text
+    if request_id is not None:
+        assert request_id not in caplog.text
     assert str(failure) not in caplog.text
 
 

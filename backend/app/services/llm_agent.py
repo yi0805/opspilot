@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from typing import Any, Literal
 
 from openai import OpenAI
@@ -17,6 +18,7 @@ from app.services.llm_tools import (
 )
 
 logger = logging.getLogger(__name__)
+SAFE_REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 
 SYSTEM_INSTRUCTIONS = (
     "Answer concise, commercially understandable business questions using the supplied "
@@ -87,9 +89,7 @@ def _log_provider_failure(stage: Literal["reasoning", "final"], error: Exception
     request_id = getattr(error, "request_id", None)
     if (
         type(request_id) is not str
-        or not request_id
-        or not request_id.isascii()
-        or not request_id.isprintable()
+        or SAFE_REQUEST_ID_PATTERN.fullmatch(request_id) is None
     ):
         request_id = None
 
