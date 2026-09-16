@@ -159,3 +159,11 @@ Keep the UI polished but small.
 **Completion evidence:** Reorganized the README for a recruiter-first introduction, surfaced the live demo, added concise engineering highlights, improved screenshot presentation with a completed-analysis result, and preserved the architecture and verified technical documentation.
 
 Only technologies actually implemented and verified may later be claimed on the resume.
+
+### Task 010 — OpenRouter Provider Migration
+
+**Status:** Complete
+
+**Goal:** Migrate the repository's AI-provider configuration from direct OpenAI API access to OpenRouter while preserving the Responses API tool-calling workflow and application behavior.
+
+**Completion evidence:** Runtime configuration, Lambda secret loading, Terraform secret access, and automated tests now use the OpenRouter key, model, endpoint, and provider routing requirement. This repository change has not been deployed to production.

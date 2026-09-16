@@ -1,8 +1,8 @@
 """Lambda cold-start entrypoint for the OpsPilot FastAPI application."""
 
-from app.core.runtime_secrets import ensure_openai_api_key
+from app.core.runtime_secrets import ensure_openrouter_api_key
 
-ensure_openai_api_key()
+ensure_openrouter_api_key()
 
 from app.db.seed import main as seed_demo_database  # noqa: E402
 

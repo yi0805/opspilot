@@ -1,4 +1,4 @@
-"""Explicit OpenAI tool definitions and safe dispatch for business queries."""
+"""Explicit Responses API tool definitions and safe dispatch for business queries."""
 
 import json
 import re

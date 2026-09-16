@@ -68,7 +68,7 @@ class BusinessQuestionResult(BaseModel):
 
 
 class LLMConfigurationError(RuntimeError):
-    """Raised when local OpenAI configuration is incomplete."""
+    """Raised when local OpenRouter configuration is incomplete."""
 
 
 class LLMProviderError(RuntimeError):
@@ -121,29 +121,31 @@ def _create_reasoning_response(
 ) -> Any:
     try:
         return client.responses.create(
-            model=settings.openai_model,
+            model=settings.openrouter_model,
             instructions=SYSTEM_INSTRUCTIONS,
             input=input_messages,
             tools=list(TOOL_DEFINITIONS),  # type: ignore[arg-type]
             parallel_tool_calls=False,
+            extra_body={"provider": {"require_parameters": True}},
         )
     except Exception as error:
-        raise LLMProviderError("OpenAI could not process the business question.") from error
+        raise LLMProviderError("OpenRouter could not process the business question.") from error
 
 
 def _create_final_response(client: OpenAI | Any, settings: Settings, input_messages: list[Any]) -> Any:
     try:
         return client.responses.create(  # type: ignore[call-overload]
-            model=settings.openai_model,
+            model=settings.openrouter_model,
             instructions=SYSTEM_INSTRUCTIONS,
             input=input_messages,
             tools=list(TOOL_DEFINITIONS),
             parallel_tool_calls=False,
             tool_choice="none",
             text={"format": FINAL_OUTPUT_SCHEMA},
+            extra_body={"provider": {"require_parameters": True}},
         )
     except Exception as error:
-        raise LLMProviderError("OpenAI could not produce a final business answer.") from error
+        raise LLMProviderError("OpenRouter could not produce a final business answer.") from error
 
 
 def answer_business_question(
@@ -156,9 +158,12 @@ def answer_business_question(
     """Answer a question through a capped, sequential allowlisted-tool workflow."""
     configured_settings = settings or get_settings()
     if client is None:
-        if not configured_settings.openai_api_key:
-            raise LLMConfigurationError("OPENAI_API_KEY is not configured.")
-        client = OpenAI(api_key=configured_settings.openai_api_key)
+        if not configured_settings.openrouter_api_key:
+            raise LLMConfigurationError("OPENROUTER_API_KEY is not configured.")
+        client = OpenAI(
+            api_key=configured_settings.openrouter_api_key,
+            base_url="https://openrouter.ai/api/v1",
+        )
 
     input_messages: list[Any] = [{"role": "user", "content": question}]
     evidence: list[EvidenceRecord] = []

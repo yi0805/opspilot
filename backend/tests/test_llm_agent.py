@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy.orm import Session
 
+from app.core.config import Settings
 from app.db.seed import seed_demo_data
 from app.services.llm_agent import (
     FINAL_OUTPUT_SCHEMA,
@@ -125,9 +126,11 @@ def test_agent_executes_two_real_tools_and_preserves_accumulated_context(session
     )
     assert len(client.responses.calls) == 4
     for request in client.responses.calls:
+        assert request["model"] == "openai/gpt-5.6-luna"
         assert request["instructions"] == SYSTEM_INSTRUCTIONS
         assert request["tools"] == list(TOOL_DEFINITIONS)
         assert request["parallel_tool_calls"] is False
+        assert request["extra_body"] == {"provider": {"require_parameters": True}}
         assert request["input"][0] == {"role": "user", "content": question}
 
     second_input = client.responses.calls[1]["input"]
@@ -275,3 +278,28 @@ def test_agent_rejects_malformed_structured_final_response(session: Session) -> 
 
     with pytest.raises(LLMProviderError, match="invalid structured final answer"):
         answer_business_question(session, "What can you help with?", client=client)
+
+
+def test_agent_constructs_openrouter_client_and_uses_default_model(
+    monkeypatch: pytest.MonkeyPatch, session: Session
+) -> None:
+    construction: dict[str, object] = {}
+
+    class FakeOpenRouterClient:
+        def __init__(self, **kwargs: object) -> None:
+            construction.update(kwargs)
+            self.responses = FakeResponses(
+                [no_tool_response(), structured_final("OpenRouter completed the answer.")]
+            )
+
+    monkeypatch.setattr("app.services.llm_agent.OpenAI", FakeOpenRouterClient)
+    settings = Settings(openrouter_api_key="router-key")
+
+    result = answer_business_question(session, "What can you help with?", settings=settings)
+
+    assert result.answer == "OpenRouter completed the answer."
+    assert settings.openrouter_model == "openai/gpt-5.6-luna"
+    assert construction == {
+        "api_key": "router-key",
+        "base_url": "https://openrouter.ai/api/v1",
+    }
