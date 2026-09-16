@@ -175,3 +175,11 @@ Only technologies actually implemented and verified may later be claimed on the 
 **Goal:** Add minimal server-side diagnostics for OpenRouter SDK failures without exposing provider details to API clients or sensitive request data to logs.
 
 **Completion evidence:** Reasoning and final provider request failures now emit only their stage, exception class name, allowlisted HTTP status code, and allowlisted request ID. The existing generic HTTP 502 response remains unchanged, and focused tests assert sensitive exception content is excluded from logs.
+
+### Task 018 — Remove Incompatible OpenRouter `require_parameters` Routing Constraint
+
+**Status:** Complete
+
+**Goal:** Remove the incompatible OpenRouter `provider.require_parameters` routing constraint from Responses API requests while preserving the agent workflow and output guardrails.
+
+**Completion evidence:** Both reasoning and final Responses API requests now omit the provider-routing constraint. Local fake-client tests confirm the requests retain their model, instructions, tools, sequential execution setting, and final structured-output settings; all backend checks pass. This repository-only change has not been deployed.
