@@ -166,7 +166,7 @@ Only technologies actually implemented and verified may later be claimed on the 
 
 **Goal:** Migrate the repository's AI-provider configuration from direct OpenAI API access to OpenRouter while preserving the Responses API tool-calling workflow and application behavior.
 
-**Completion evidence:** Runtime configuration, Lambda secret loading, Terraform secret access, and automated tests use the OpenRouter key, model, and endpoint. Task 021 production verification confirmed OpenRouter is live with model `openai/gpt-5.6-luna`.
+**Completion evidence:** Runtime configuration, Lambda secret loading, Terraform secret access, and automated tests use the OpenRouter key, model, and endpoint. Task 020 production verification confirmed OpenRouter is live with model `openai/gpt-5.6-luna`; Task 021 records that verified state.
 
 ### Task 014 — Safe OpenRouter Provider Error Observability
 
@@ -182,7 +182,7 @@ Only technologies actually implemented and verified may later be claimed on the 
 
 **Goal:** Remove the incompatible OpenRouter `provider.require_parameters` routing constraint from Responses API requests while preserving the agent workflow and output guardrails.
 
-**Completion evidence:** Both reasoning and final Responses API requests omit `provider.require_parameters`. Local fake-client tests confirm the requests retain their model, instructions, tools, sequential execution setting, and final structured-output settings; all backend checks pass. Task 021 production verification confirmed the removal fixed the previous OpenRouter 404 routing failure.
+**Completion evidence:** Both reasoning and final Responses API requests omit `provider.require_parameters`. Local fake-client tests confirm the requests retain their model, instructions, tools, sequential execution setting, and final structured-output settings; all backend checks pass. Task 020 production verification confirmed the removal fixed the previous OpenRouter 404 routing failure; Task 021 records that verified result.
 
 ### Task 021 — OpenRouter Production Verification Closeout
 

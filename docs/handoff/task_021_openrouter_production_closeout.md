@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete — documentation-only closeout of an already completed controlled deployment and production verification.
+Complete — documentation-only closeout of the controlled deployment and final production verification completed by Task 020.
 
 ## Goal
 
@@ -13,7 +13,7 @@ Record the final, production-verified OpenRouter architecture and migration stat
 - **Branch:** `task/021-openrouter-production-closeout`
 - **Base commit:** `f1b397c1d32208df885fd7a36dbf73c504c1f390`
 - **Final commit:** this handoff's containing commit
-- **Pull request:** pending creation
+- **Pull request:** #15
 
 ## Key changes
 
@@ -22,12 +22,13 @@ Record the final, production-verified OpenRouter architecture and migration stat
 - Recorded that the sequential allowlisted tool workflow, `parallel_tool_calls=False`, final structured output, and application-owned authoritative evidence remain unchanged.
 - Recorded the production CloudFront/Lambda security posture: CloudFront remains healthy; the Function URL remains `AWS_IAM` with buffered invocation; CloudFront OAC remains SigV4 `signing=always`; unsigned direct Function URL access is denied; and Lambda retains only the exact `ssm:GetParameter` access required for `/opspilot/prod/openrouter-api-key`.
 
-## Production verification recorded
+## Task 020 production verification recorded
 
-- The Task 018 routing fix was deployed successfully in Lambda image `f1b397c1d32208df885fd7a36dbf73c504c1f390`.
+- Task 020 deployed the Task 018 routing fix successfully in Lambda image `f1b397c1d32208df885fd7a36dbf73c504c1f390`.
 - CloudFront and `GET /api/health` returned HTTP 200.
 - A production agent request returned HTTP 200 with application status `completed`.
 - `query_sales` and `query_inventory` evidence completed successfully, each with source `synthetic_business_data`.
+- The returned recommendation passed the supporting-evidence guardrail.
 - No provider-failure warning occurred.
 - The final Terraform plan reported no changes.
 

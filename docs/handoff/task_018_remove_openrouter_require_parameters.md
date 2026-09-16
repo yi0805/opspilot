@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete as a repository-only change. The fix was subsequently deployed and production-verified by Task 021.
+Complete as a repository-only change. The fix was subsequently deployed and production-verified by Task 020; Task 021 records that verified result.
 
 ## Goal
 
@@ -32,7 +32,7 @@ Remove the incompatible OpenRouter `provider.require_parameters` routing constra
 ## Known limitations and decisions
 
 - This task made no provider or model request; its tests use local fake clients only.
-- This task made no AWS, Terraform, SSM, deployment, secret retrieval, Docker build, or production smoke-test action. Subsequent production verification confirmed the removed constraint had caused the prior OpenRouter 404 routing failure and that normal routing succeeds without it.
+- This task made no AWS, Terraform, SSM, deployment, secret retrieval, Docker build, or production smoke-test action. Subsequent Task 020 production verification confirmed the removed constraint had caused the prior OpenRouter 404 routing failure and that normal routing succeeds without it; Task 021 records that verified result.
 - No replacement provider routing configuration was added; OpenRouter performs normal provider routing.
 
 ## Recommended next task

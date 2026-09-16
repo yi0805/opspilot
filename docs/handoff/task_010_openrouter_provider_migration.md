@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete as a repository change. Subsequent Task 021 production verification confirmed the migration is deployed.
+Complete as a repository change. Subsequent Task 020 production verification confirmed the migration is deployed; Task 021 records that verified state.
 
 ## Goal
 
@@ -36,7 +36,7 @@ Migrate the existing Responses API agent integration from direct OpenAI API acce
 
 ## Known limitations and decisions
 
-- This task itself did not change AWS resources, SSM values, or deployment. Subsequent controlled deployment and Task 021 verification confirmed the production provider/router is OpenRouter.
+- This task itself did not change AWS resources, SSM values, or deployment. Subsequent Task 020 controlled deployment and verification confirmed the production provider/router is OpenRouter; Task 021 is documentation-only closeout.
 - No provider abstraction, fallback key, optional OpenRouter attribution headers, or upstream-provider pin was added.
 
 ## Recommended next task
